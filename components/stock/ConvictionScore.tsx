@@ -18,8 +18,8 @@ export default function ConvictionScore({ ticker }: Props) {
     if (stored) setScore(parseInt(stored, 10));
   }, [ticker]);
 
-  const handleChange = (val: number[]) => {
-    const v = val[0];
+  const handleChange = (val: number | readonly number[]) => {
+    const v = (val as number[])[0];
     setScore(v);
     localStorage.setItem(key, v.toString());
     setSaved(true);

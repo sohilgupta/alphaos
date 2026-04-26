@@ -116,7 +116,7 @@ export default function ScreenerPage() {
               <Slider
                 value={[filters.minGain1M, Math.min(filters.maxGain1M, 500)]}
                 min={-100} max={500} step={5}
-                onValueChange={([min, max]) => setFilters(f => ({ ...f, minGain1M: min, maxGain1M: max }))}
+                onValueChange={(val) => setFilters(f => ({ ...f, minGain1M: (val as number[])[0], maxGain1M: (val as number[])[1] }))}
                 className="w-full"
               />
             </div>
@@ -130,7 +130,7 @@ export default function ScreenerPage() {
               <Slider
                 value={[filters.minGain1Y, Math.min(filters.maxGain1Y, 2000)]}
                 min={-100} max={2000} step={10}
-                onValueChange={([min, max]) => setFilters(f => ({ ...f, minGain1Y: min, maxGain1Y: max }))}
+                onValueChange={(val) => setFilters(f => ({ ...f, minGain1Y: (val as number[])[0], maxGain1Y: (val as number[])[1] }))}
                 className="w-full"
               />
             </div>
