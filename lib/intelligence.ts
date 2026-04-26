@@ -40,8 +40,8 @@ export function suggestTheme(data: { name?: string; description?: string; sector
       const matches = textToSearch.match(regex);
       if (matches) {
         // Give higher weight to matches in sector/industry vs description
-        const inSector = (detail.sector || '').toLowerCase().includes(kw);
-        const inIndustry = (detail.industry || '').toLowerCase().includes(kw);
+        const inSector = (data.sector || '').toLowerCase().includes(kw);
+        const inIndustry = (data.industry || '').toLowerCase().includes(kw);
         
         if (inSector || inIndustry) {
           score += 30; // Strong signal
