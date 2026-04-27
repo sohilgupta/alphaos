@@ -12,6 +12,7 @@ import ConvictionScore from '@/components/stock/ConvictionScore';
 import { formatPrice, formatPercent, getChangeBg, getChangeColor } from '@/lib/format';
 import { StockDetail, SheetStock, PortfolioStock } from '@/lib/types';
 import { ThemeSuggestion } from '@/lib/intelligence';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 async function fetchStockDetail(ticker: string) {
   const res = await fetch(`/api/stock/${ticker}`);
@@ -79,6 +80,7 @@ function ValuationBadge({ pe, fairPrice, currentPrice }: {
 export default function StockDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { role } = useAuth();
   const ticker = (params?.ticker as string || '').toUpperCase();
 
   const { data, isLoading, isError } = useQuery({
@@ -187,7 +189,7 @@ export default function StockDetailPage() {
       </div>
 
       {/* Portfolio Position */}
-      {!isLoading && portfolioData && (
+      {!isLoading && role === 'owner' && portfolioData && (
         <div className="glass-card p-5 border-primary/30">
           <h2 className="text-sm font-600 text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
             💰 Your Position

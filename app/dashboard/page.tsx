@@ -11,6 +11,7 @@ import { formatPercent, formatPrice, getChangeBg, getChangeColor } from '@/lib/f
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 async function fetchStocks() {
   const res = await fetch('/api/stocks', { next: { revalidate: 0 } });
@@ -20,6 +21,8 @@ async function fetchStocks() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { role } = useAuth();
+  const isOwner = role === 'owner';
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['stocks'],
     queryFn: fetchStocks,
@@ -35,11 +38,11 @@ export default function DashboardPage() {
   const filteredByView = useMemo(() => {
     switch (viewFilter) {
       case 'WATCHLIST': return stocks.filter(s => s.isInWatchlist && !s.isInPortfolio);
-      case 'PORTFOLIO': return stocks.filter(s => !s.isInWatchlist && s.isInPortfolio);
-      case 'OVERLAP': return stocks.filter(s => s.isInWatchlist && s.isInPortfolio);
+      case 'PORTFOLIO': return isOwner ? stocks.filter(s => !s.isInWatchlist && s.isInPortfolio) : stocks;
+      case 'OVERLAP': return isOwner ? stocks.filter(s => s.isInWatchlist && s.isInPortfolio) : stocks;
       default: return stocks;
     }
-  }, [stocks, viewFilter]);
+  }, [stocks, viewFilter, isOwner]);
 
   // Build tab list from unique categories of the currently filtered view
   const tabs = useMemo(() => {
@@ -79,7 +82,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-800 text-foreground tracking-tight">Hedge Fund Dashboard</h1>
+          <h1 className="text-2xl font-800 text-foreground tracking-tight">AlphaOS Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {isLoading ? 'Loading…' : `${filteredByView.length} stocks across ${tabs.length - 1} categories`}
           </p>
@@ -89,8 +92,10 @@ export default function DashboardPage() {
             {[
               { id: 'ALL', label: 'All', icon: '' },
               { id: 'WATCHLIST', label: 'Watchlist', icon: '🧠' },
-              { id: 'PORTFOLIO', label: 'Portfolio', icon: '💰' },
-              { id: 'OVERLAP', label: 'Conviction', icon: '🔥' }
+              ...(isOwner ? [
+                { id: 'PORTFOLIO', label: 'Portfolio', icon: '💰' },
+                { id: 'OVERLAP', label: 'Conviction', icon: '🔥' }
+              ] : [])
             ].map(f => (
               <button
                 key={f.id}
@@ -122,7 +127,7 @@ export default function DashboardPage() {
             format: (v: number) => v.toString(),
           },
           {
-            label: 'Portfolio Today',
+            label: isOwner ? 'Portfolio Today' : 'Watchlist Today',
             value: avgChange,
             icon: Activity,
             format: (v: number) => formatPercent(v),

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPercent, formatPrice, getChangeBg, getChangeColor, getHeatmapColor } from '@/lib/format';
 import { MergedStock, CategoryPerformance } from '@/lib/types';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 async function fetchStocks() {
   const res = await fetch('/api/stocks');
@@ -20,6 +21,8 @@ async function fetchStocks() {
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  const { role } = useAuth();
+  const isOwner = role === 'owner';
   const { data, isLoading } = useQuery({ queryKey: ['stocks'], queryFn: fetchStocks });
   const stocks: MergedStock[] = data?.stocks ?? [];
   const portfolioTotalValue = useMemo(() => stocks.filter(s => s.isInPortfolio).reduce((sum, s) => sum + (s.portfolioData?.investedValue || 0), 0), [stocks]);
@@ -141,6 +144,16 @@ export default function AnalyticsPage() {
     );
   }
 
+  if (!isOwner) {
+    return (
+      <div className="p-6">
+        <div className="glass-card p-6 text-center text-muted-foreground">
+          Portfolio analytics are available to the authenticated owner only.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       <div>
@@ -151,7 +164,7 @@ export default function AnalyticsPage() {
       {/* Portfolio Intelligence Section */}
       <div className="glass-card p-5 border-primary/20">
         <h2 className="text-lg font-700 text-primary mb-4 flex items-center gap-2">
-          🧠 Hedge Fund Intelligence
+          🧠 AlphaOS Intelligence
         </h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

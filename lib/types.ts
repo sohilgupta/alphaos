@@ -67,6 +67,28 @@ export interface PortfolioStock {
   investedValue: number;
 }
 
+export type UserRole = 'public' | 'owner';
+
+export interface User {
+  id: string;
+  role: UserRole;
+}
+
+export interface Stock {
+  ticker: string;
+  name: string;
+  theme: string;
+  notes?: string;
+  isWatchlist: boolean;
+  isPortfolio: boolean;
+  quantity?: number;
+  avgBuyPrice?: number;
+  currentValue?: number;
+  pnl?: number;
+  price: number;
+  change1D: number;
+}
+
 export interface MergedStock {
   ticker: string;
   name: string;
@@ -91,6 +113,10 @@ export interface MergedStock {
   isInWatchlist: boolean;
   isInPortfolio: boolean;
   portfolioData?: PortfolioData;
+  quantity?: number;
+  avgBuyPrice?: number;
+  currentValue?: number;
+  pnl?: number;
   originalTheme?: string;
   suggestedTheme?: string;
   themeConfidence?: number;

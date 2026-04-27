@@ -3,18 +3,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, ChevronRight } from 'lucide-react';
+import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, ChevronRight, Shield, LockOpen } from 'lucide-react';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart2 },
-  { href: '/analytics', label: 'Analytics', icon: TrendingUp },
-  { href: '/screener', label: 'Screener', icon: Filter },
-];
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [lastUpdated, setLastUpdated] = useState<string>('—');
   const [refreshing, setRefreshing] = useState(false);
+  const { role, logout } = useAuth();
+  const navItems = role === 'owner'
+    ? [
+        { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
+        { href: '/portfolio', label: 'Portfolio', icon: TrendingUp },
+        { href: '/analytics', label: 'Dashboard', icon: Filter },
+      ]
+    : [
+        { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
+        { href: '/screener', label: 'Themes', icon: Filter },
+      ];
 
   useEffect(() => {
     const ts = localStorage.getItem('lastRefresh');
@@ -41,7 +48,7 @@ export default function Sidebar() {
           <Activity className="w-4 h-4 text-white" />
         </div>
         <div>
-          <div className="text-sm font-700 text-foreground leading-none">Stock Intel</div>
+          <div className="text-sm font-700 text-foreground leading-none">AlphaOS</div>
           <div className="text-xs text-muted-foreground mt-0.5">Dashboard</div>
         </div>
       </div>
@@ -68,8 +75,26 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Refresh */}
-      <div className="p-3 border-t border-white/8">
+      {/* Actions */}
+      <div className="p-3 border-t border-white/8 space-y-1">
+        {role === 'owner' ? (
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-primary hover:bg-white/4 transition-all font-600"
+          >
+            <LockOpen className="w-3.5 h-3.5" />
+            <span className="flex-1 text-left">Lock Portfolio</span>
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-white/4 transition-all"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span className="flex-1 text-left">Owner Login</span>
+          </Link>
+        )}
+
         <button
           onClick={handleRefresh}
           disabled={refreshing}

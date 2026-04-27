@@ -3,6 +3,8 @@ import { fetchAllSheetStocks, fetchPortfolioStocks } from '@/lib/google-sheets';
 import { getBatchQuotes } from '@/lib/yahoo-finance';
 import { suggestTheme } from '@/lib/intelligence';
 import { MergedStock } from '@/lib/types';
+import { isAuthenticated } from '@/lib/auth';
+import { SHOW_PORTFOLIO_FLAG } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,12 +13,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('refresh') === 'true';
+    const isOwner = await isAuthenticated();
 
-    // 1. Fetch both sheets concurrently
-    const [sheetStocks, portfolioStocks] = await Promise.all([
-      fetchAllSheetStocks(forceRefresh),
-      fetchPortfolioStocks(forceRefresh),
-    ]);
+    // Public users only receive watchlist data; owner gets merged watchlist + portfolio.
+    const sheetStocks = await fetchAllSheetStocks(forceRefresh);
+    const portfolioStocks = isOwner ? await fetchPortfolioStocks(forceRefresh) : [];
 
     // 2. Build Maps
     const watchlistMap = new Map(sheetStocks.map(s => [s.ticker, s]));
@@ -49,6 +50,13 @@ export async function GET(request: Request) {
       const description = wData?.description || '';
       const suggestion = suggestTheme({ name, description });
 
+      const quantity = pData?.quantity;
+      const avgBuyPrice = pData?.avgBuyPrice;
+      const currentValue = quantity && live?.price ? quantity * live.price : undefined;
+      const pnl = quantity && avgBuyPrice && live?.price
+        ? (live.price - avgBuyPrice) * quantity
+        : undefined;
+
       merged.push({
         ticker,
         name,
@@ -67,14 +75,18 @@ export async function GET(request: Request) {
         live,
         convictionScore: 5, // default
         alertThreshold: null,
-        tags,
+        tags: isOwner ? tags : tags.filter((tag) => tag !== 'PORTFOLIO ONLY' && tag !== 'WATCHLIST + PORTFOLIO'),
         isInWatchlist,
-        isInPortfolio,
-        portfolioData: pData ? {
+        isInPortfolio: isOwner ? isInPortfolio : (SHOW_PORTFOLIO_FLAG ? isInPortfolio : false),
+        portfolioData: (isOwner && pData) ? {
           quantity: pData.quantity,
           avgBuyPrice: pData.avgBuyPrice,
           investedValue: pData.investedValue
         } : undefined,
+        quantity: isOwner ? quantity : undefined,
+        avgBuyPrice: isOwner ? avgBuyPrice : undefined,
+        currentValue: isOwner ? currentValue : undefined,
+        pnl: isOwner ? pnl : undefined,
         originalTheme: wData?.category,
         suggestedTheme: suggestion?.theme,
         themeConfidence: suggestion?.confidence

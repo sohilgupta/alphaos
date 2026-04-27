@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice, formatPercent, formatMarketCap, getChangeBg, getChangeColor } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 type SortKey = 'ticker' | 'name' | 'price' | 'changePercent' | 'marketCap' | 'pe' | 'gain1M' | 'gain1Y';
 type SortDir = 'asc' | 'desc';
@@ -20,6 +21,8 @@ interface Props {
 
 export default function StockTable({ stocks, isLoading }: Props) {
   const router = useRouter();
+  const { role } = useAuth();
+  const isOwner = role === 'owner';
   const [sortKey, setSortKey] = useState<SortKey>('changePercent');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
@@ -135,9 +138,9 @@ export default function StockTable({ stocks, isLoading }: Props) {
                 <div>
                   <div className="flex items-center gap-1">
                     <div className="text-sm font-700 text-foreground">{stock.ticker}</div>
-                    {stock.isInWatchlist && stock.isInPortfolio && <span title="Watchlist + Portfolio">🔥</span>}
+                    {isOwner && stock.isInWatchlist && stock.isInPortfolio && <span title="Watchlist + Portfolio">🔥</span>}
                     {stock.isInWatchlist && !stock.isInPortfolio && <span title="Watchlist Only">🧠</span>}
-                    {!stock.isInWatchlist && stock.isInPortfolio && <span title="Portfolio Only">💰</span>}
+                    {isOwner && !stock.isInWatchlist && stock.isInPortfolio && <span title="Portfolio Only">💰</span>}
                   </div>
                   <div className="text-xs text-muted-foreground truncate max-w-[100px]">{stock.name}</div>
                 </div>
@@ -169,9 +172,9 @@ export default function StockTable({ stocks, isLoading }: Props) {
                   <ColHeader k="name" label="Company" />
                   <ColHeader k="price" label="Price" className="text-right" />
                   <ColHeader k="changePercent" label="Day %" className="text-right" />
-                  <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">Qty</th>
-                  <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">Avg Price</th>
-                  <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">P&L</th>
+                  {isOwner && <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">Qty</th>}
+                  {isOwner && <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">Avg Price</th>}
+                  {isOwner && <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">P&L</th>}
                   <th className="px-4 py-3 text-left text-xs font-600 text-muted-foreground uppercase tracking-wider">Theme</th>
                 </tr>
               </thead>
@@ -190,9 +193,9 @@ export default function StockTable({ stocks, isLoading }: Props) {
                     >
                       {/* Tags */}
                       <td className="px-4 py-3 text-base">
-                        {stock.isInWatchlist && stock.isInPortfolio && <span title="Watchlist + Portfolio">🔥</span>}
+                        {isOwner && stock.isInWatchlist && stock.isInPortfolio && <span title="Watchlist + Portfolio">🔥</span>}
                         {stock.isInWatchlist && !stock.isInPortfolio && <span title="Watchlist Only">🧠</span>}
-                        {!stock.isInWatchlist && stock.isInPortfolio && <span title="Portfolio Only">💰</span>}
+                        {isOwner && !stock.isInWatchlist && stock.isInPortfolio && <span title="Portfolio Only">💰</span>}
                       </td>
                       {/* Ticker */}
                       <td className="px-4 py-3">
@@ -222,27 +225,31 @@ export default function StockTable({ stocks, isLoading }: Props) {
                         ) : '—'}
                       </td>
                       {/* Qty */}
-                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {stock.portfolioData ? stock.portfolioData.quantity : '—'}
-                      </td>
-                      {/* Avg Price */}
-                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {stock.portfolioData ? formatPrice(stock.portfolioData.avgBuyPrice) : '—'}
-                      </td>
-                      {/* P&L */}
-                      <td className="px-4 py-3 text-right tabular-nums font-600">
-                        {(() => {
-                          if (!stock.portfolioData || !price) return <span className="text-muted-foreground">—</span>;
-                          const plValue = (price - stock.portfolioData.avgBuyPrice) * stock.portfolioData.quantity;
-                          const plPercent = ((price - stock.portfolioData.avgBuyPrice) / stock.portfolioData.avgBuyPrice) * 100;
-                          return (
-                            <div>
-                              <div className={getChangeColor(plValue)}>{formatPrice(plValue)}</div>
-                              <div className={`text-xs ${getChangeColor(plPercent)}`}>{formatPercent(plPercent)}</div>
-                            </div>
-                          );
-                        })()}
-                      </td>
+                      {isOwner && (
+                        <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                          {stock.portfolioData ? stock.portfolioData.quantity : '—'}
+                        </td>
+                      )}
+                      {isOwner && (
+                        <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                          {stock.portfolioData ? formatPrice(stock.portfolioData.avgBuyPrice) : '—'}
+                        </td>
+                      )}
+                      {isOwner && (
+                        <td className="px-4 py-3 text-right tabular-nums font-600">
+                          {(() => {
+                            if (!stock.portfolioData || !price) return <span className="text-muted-foreground">—</span>;
+                            const plValue = (price - stock.portfolioData.avgBuyPrice) * stock.portfolioData.quantity;
+                            const plPercent = ((price - stock.portfolioData.avgBuyPrice) / stock.portfolioData.avgBuyPrice) * 100;
+                            return (
+                              <div>
+                                <div className={getChangeColor(plValue)}>{formatPrice(plValue)}</div>
+                                <div className={`text-xs ${getChangeColor(plPercent)}`}>{formatPercent(plPercent)}</div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      )}
                       {/* Theme */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
