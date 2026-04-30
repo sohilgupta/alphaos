@@ -1,13 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, LayoutGrid, List, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatPrice, formatPercent, formatMarketCap, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPercent, formatStockPrice, getChangeBg, getChangeColor } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -17,6 +16,39 @@ type SortDir = 'asc' | 'desc';
 interface Props {
   stocks: MergedStock[];
   isLoading: boolean;
+}
+
+function returnsForStock(stock: MergedStock) {
+  return [
+    { label: '1D', value: stock.live?.changePercent ?? null },
+    { label: '1W', value: stock.gain1W },
+    { label: '1M', value: stock.gain1M },
+    { label: '1Y', value: stock.gain1Y },
+    { label: '3Y', value: stock.gain3Y },
+  ];
+}
+
+function ReturnCard({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="shrink-0 min-w-16 rounded-md border border-white/8 bg-white/[0.03] px-2.5 py-2 text-center">
+      <div className="text-[10px] font-600 text-muted-foreground uppercase">{label}</div>
+      <div className={`mt-0.5 text-xs font-700 tabular-nums ${getChangeColor(value)}`}>
+        {formatPercent(value)}
+      </div>
+    </div>
+  );
+}
+
+function ReturnStrip({ stock }: { stock: MergedStock }) {
+  return (
+    <div className="overflow-x-auto w-full">
+      <div className="flex gap-2 min-w-max">
+        {returnsForStock(stock).map((item) => (
+          <ReturnCard key={item.label} label={item.label} value={item.value} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function StockTable({ stocks, isLoading }: Props) {
@@ -29,7 +61,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
   const [view, setView] = useState<'table' | 'grid'>('table');
 
   const sorted = useMemo(() => {
-    let filtered = stocks.filter(s =>
+    const filtered = stocks.filter(s =>
       !search ||
       s.ticker.toLowerCase().includes(search.toLowerCase()) ||
       s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -63,20 +95,20 @@ export default function StockTable({ stocks, isLoading }: Props) {
     else { setSortKey(key); setSortDir('desc'); }
   };
 
-  const SortIcon = ({ k }: { k: SortKey }) => {
+  const renderSortIcon = (k: SortKey) => {
     if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
     return sortDir === 'desc'
       ? <ArrowDown className="w-3 h-3 text-primary" />
       : <ArrowUp className="w-3 h-3 text-primary" />;
   };
 
-  const ColHeader = ({ k, label, className = '' }: { k: SortKey; label: string; className?: string }) => (
+  const renderColHeader = (k: SortKey, label: string, className = '') => (
     <th
       className={`px-4 py-3 text-left text-xs font-600 text-muted-foreground uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors ${className}`}
       onClick={() => handleSort(k)}
     >
       <div className="flex items-center gap-1.5">
-        {label} <SortIcon k={k} />
+        {label} {renderSortIcon(k)}
       </div>
     </th>
   );
@@ -96,10 +128,10 @@ export default function StockTable({ stocks, isLoading }: Props) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-w-full overflow-hidden">
       {/* Controls */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             id="stock-search"
@@ -127,7 +159,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
       </div>
 
       {view === 'grid' ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {sorted.map(stock => (
             <div
               key={stock.ticker}
@@ -138,40 +170,89 @@ export default function StockTable({ stocks, isLoading }: Props) {
                 <div>
                   <div className="flex items-center gap-1">
                     <div className="text-sm font-700 text-foreground">{stock.ticker}</div>
-                    {isOwner && stock.isInWatchlist && stock.isInPortfolio && <span title="Watchlist + Portfolio">🔥</span>}
-                    {stock.isInWatchlist && !stock.isInPortfolio && <span title="Watchlist Only">🧠</span>}
-                    {isOwner && !stock.isInWatchlist && stock.isInPortfolio && <span title="Portfolio Only">💰</span>}
+                    {isOwner && stock.isInWatchlist && stock.isInPortfolio && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Both</Badge>}
+                    {stock.isInWatchlist && !stock.isInPortfolio && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Watch</Badge>}
+                    {isOwner && !stock.isInWatchlist && stock.isInPortfolio && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Port</Badge>}
                   </div>
                   <div className="text-xs text-muted-foreground truncate max-w-[100px]">{stock.name}</div>
                 </div>
                 <ExternalLink className="w-3 h-3 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors" />
               </div>
               <div className="text-lg font-700 tabular-nums">
-                {stock.live?.price ? formatPrice(stock.live.price) : (stock.currentPriceSheet ? `$${stock.currentPriceSheet}` : '—')}
+                {stock.live?.price ? formatStockPrice(stock.live.price, stock.region) : formatStockPrice(stock.currentPriceSheet, stock.region)}
               </div>
               {stock.live?.changePercent != null && (
                 <Badge className={`mt-1 text-xs font-600 ${getChangeBg(stock.live.changePercent)}`} variant="secondary">
                   {formatPercent(stock.live.changePercent)}
                 </Badge>
               )}
-              <div className="mt-2 pt-2 border-t border-white/8 flex justify-between text-xs text-muted-foreground">
-                <span>1M</span>
-                <span className={getChangeColor(stock.gain1M)}>{formatPercent(stock.gain1M)}</span>
+              <div className="mt-3 pt-3 border-t border-white/8">
+                <ReturnStrip stock={stock} />
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-white/8 overflow-hidden">
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-sm">
-              <thead style={{ background: 'oklch(0.10 0.006 264)' }}>
+        <>
+          <div className="md:hidden space-y-3">
+            {sorted.map(stock => {
+              const price = stock.live?.price;
+              return (
+                <div
+                  key={stock.ticker}
+                  onClick={() => router.push(`/stock/${stock.ticker}`)}
+                  className="glass-card p-4 cursor-pointer hover:border-primary/30 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-800 text-foreground">{stock.ticker}</span>
+                        <Badge variant="secondary" className="text-[10px]">{stock.region === 'INDIA' ? 'India' : 'US'}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">{stock.live?.shortName || stock.name}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-700 tabular-nums">{price ? formatStockPrice(price, stock.region) : formatStockPrice(stock.currentPriceSheet, stock.region)}</div>
+                      <Badge className={`mt-1 text-xs font-600 ${getChangeBg(stock.live?.changePercent ?? null)}`} variant="secondary">
+                        {formatPercent(stock.live?.changePercent ?? null)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <ReturnStrip stock={stock} />
+                  </div>
+                  {isOwner && stock.portfolioData && (
+                    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-xs">
+                      <div>
+                        <div className="text-muted-foreground">Qty</div>
+                        <div className="font-700 tabular-nums">{stock.portfolioData.quantity}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Avg</div>
+                        <div className="font-700 tabular-nums">{formatStockPrice(stock.portfolioData.avgBuyPrice, stock.region)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">P&L</div>
+                        <div className={`font-700 tabular-nums ${getChangeColor(stock.pnl ?? null)}`}>{formatStockPrice(stock.pnl ?? null, stock.region)}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden md:block rounded-xl border border-white/8 overflow-hidden">
+            <div className="overflow-x-auto w-full scrollbar-thin">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead className="sticky top-0 z-10" style={{ background: 'oklch(0.10 0.006 264)' }}>
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-600 text-muted-foreground uppercase tracking-wider">Tag</th>
-                  <ColHeader k="ticker" label="Ticker" />
-                  <ColHeader k="name" label="Company" />
-                  <ColHeader k="price" label="Price" className="text-right" />
-                  <ColHeader k="changePercent" label="Day %" className="text-right" />
+                  {renderColHeader('ticker', 'Ticker')}
+                  {renderColHeader('name', 'Company')}
+                  {renderColHeader('price', 'Price', 'text-right')}
+                  {renderColHeader('changePercent', 'Day %', 'text-right')}
+                  <th className="px-4 py-3 text-left text-xs font-600 text-muted-foreground uppercase tracking-wider">Returns</th>
                   {isOwner && <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">Qty</th>}
                   {isOwner && <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">Avg Price</th>}
                   {isOwner && <th className="px-4 py-3 text-right text-xs font-600 text-muted-foreground uppercase tracking-wider">P&L</th>}
@@ -181,10 +262,6 @@ export default function StockTable({ stocks, isLoading }: Props) {
               <tbody className="divide-y divide-white/5">
                 {sorted.map(stock => {
                   const price = stock.live?.price;
-                  const hi = stock.live?.week52High;
-                  const lo = stock.live?.week52Low;
-                  const rangePos = hi && lo && price ? ((price - lo) / (hi - lo)) * 100 : null;
-
                   return (
                     <tr
                       key={stock.ticker}
@@ -193,9 +270,9 @@ export default function StockTable({ stocks, isLoading }: Props) {
                     >
                       {/* Tags */}
                       <td className="px-4 py-3 text-base">
-                        {isOwner && stock.isInWatchlist && stock.isInPortfolio && <span title="Watchlist + Portfolio">🔥</span>}
-                        {stock.isInWatchlist && !stock.isInPortfolio && <span title="Watchlist Only">🧠</span>}
-                        {isOwner && !stock.isInWatchlist && stock.isInPortfolio && <span title="Portfolio Only">💰</span>}
+                        {isOwner && stock.isInWatchlist && stock.isInPortfolio && <Badge variant="secondary" className="text-[10px]">Both</Badge>}
+                        {stock.isInWatchlist && !stock.isInPortfolio && <Badge variant="secondary" className="text-[10px]">Watch</Badge>}
+                        {isOwner && !stock.isInWatchlist && stock.isInPortfolio && <Badge variant="secondary" className="text-[10px]">Port</Badge>}
                       </td>
                       {/* Ticker */}
                       <td className="px-4 py-3">
@@ -214,7 +291,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
                       </td>
                       {/* Price */}
                       <td className="px-4 py-3 text-right tabular-nums font-600">
-                        {price ? formatPrice(price) : (stock.currentPriceSheet ? `$${stock.currentPriceSheet}` : '—')}
+                        {price ? formatStockPrice(price, stock.region) : formatStockPrice(stock.currentPriceSheet, stock.region)}
                       </td>
                       {/* Day % */}
                       <td className="px-4 py-3 text-right">
@@ -224,6 +301,9 @@ export default function StockTable({ stocks, isLoading }: Props) {
                           </Badge>
                         ) : '—'}
                       </td>
+                      <td className="px-4 py-3 min-w-[360px]">
+                        <ReturnStrip stock={stock} />
+                      </td>
                       {/* Qty */}
                       {isOwner && (
                         <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
@@ -232,7 +312,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
                       )}
                       {isOwner && (
                         <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                          {stock.portfolioData ? formatPrice(stock.portfolioData.avgBuyPrice) : '—'}
+                          {stock.portfolioData ? formatStockPrice(stock.portfolioData.avgBuyPrice, stock.region) : '—'}
                         </td>
                       )}
                       {isOwner && (
@@ -243,7 +323,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
                             const plPercent = ((price - stock.portfolioData.avgBuyPrice) / stock.portfolioData.avgBuyPrice) * 100;
                             return (
                               <div>
-                                <div className={getChangeColor(plValue)}>{formatPrice(plValue)}</div>
+                                <div className={getChangeColor(plValue)}>{formatStockPrice(plValue, stock.region)}</div>
                                 <div className={`text-xs ${getChangeColor(plPercent)}`}>{formatPercent(plPercent)}</div>
                               </div>
                             );
@@ -265,9 +345,10 @@ export default function StockTable({ stocks, isLoading }: Props) {
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

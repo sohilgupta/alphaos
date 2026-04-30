@@ -11,6 +11,10 @@ export function formatPrice(price: number | null | undefined, currency = 'USD'):
   }).format(price);
 }
 
+export function formatStockPrice(price: number | null | undefined, region?: 'US' | 'INDIA'): string {
+  return formatPrice(price, region === 'INDIA' ? 'INR' : 'USD');
+}
+
 export function formatPercent(val: number | null | undefined, decimals = 2): string {
   if (val == null) return '—';
   const sign = val >= 0 ? '+' : '';

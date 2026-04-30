@@ -1,30 +1,36 @@
 // app/api/stock/[ticker]/route.ts
 
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getStockDetail } from '@/lib/yahoo-finance';
 import { fetchAllSheetStocks, fetchPortfolioStocks } from '@/lib/google-sheets';
+import { getIndianPortfolio, getIndianWatchlist } from '@/lib/fetchIndianStocks';
 import { suggestTheme } from '@/lib/intelligence';
-import { isAuthenticated } from '@/lib/auth';
-import { SHOW_PORTFOLIO_FLAG } from '@/lib/config';
+import { getUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> }
 ) {
   const { ticker } = await params;
   const upperTicker = ticker.toUpperCase();
 
   try {
-    const isOwner = await isAuthenticated();
+    const user = await getUser(request);
+    const isOwner = user?.role === 'owner';
 
-    const [detail, sheetStocks, portfolioStocks] = await Promise.all([
+    const [detail, usSheetStocks, indianSheetStocks, usPortfolioStocks, indianPortfolioStocks] = await Promise.all([
       getStockDetail(upperTicker),
       fetchAllSheetStocks(),
+      getIndianWatchlist(),
       isOwner ? fetchPortfolioStocks() : Promise.resolve([]),
+      isOwner ? getIndianPortfolio() : Promise.resolve([]),
     ]);
 
+    const sheetStocks = [...usSheetStocks, ...indianSheetStocks];
+    const portfolioStocks = isOwner ? [...usPortfolioStocks, ...indianPortfolioStocks] : [];
     const sheetData = sheetStocks.find(s => s.ticker === upperTicker) ?? null;
     const portfolioData = portfolioStocks.find(s => s.ticker === upperTicker) ?? null;
 
@@ -39,7 +45,7 @@ export async function GET(
         detail,
         sheetData,
         portfolioData: isOwner ? portfolioData : null,
-        isInPortfolio: isOwner ? !!portfolioData : SHOW_PORTFOLIO_FLAG && !!portfolioData,
+        isInPortfolio: isOwner ? !!portfolioData : false,
         role: isOwner ? 'owner' : 'public',
         suggestion
       },

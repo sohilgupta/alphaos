@@ -1,99 +1,41 @@
 import { NextResponse } from 'next/server';
 import { fetchAllSheetStocks, fetchPortfolioStocks } from '@/lib/google-sheets';
+import { getIndianPortfolio, getIndianWatchlist } from '@/lib/fetchIndianStocks';
 import { getBatchQuotes } from '@/lib/yahoo-finance';
-import { suggestTheme } from '@/lib/intelligence';
 import { MergedStock } from '@/lib/types';
-import { isAuthenticated } from '@/lib/auth';
-import { SHOW_PORTFOLIO_FLAG } from '@/lib/config';
+import { getUser } from '@/lib/auth';
+import { mergeIndianData, mergeUSData } from '@/lib/merge-stocks';
+import type { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('refresh') === 'true';
-    const isOwner = await isAuthenticated();
+    const user = await getUser(request);
+    const isOwner = user?.role === 'owner';
 
-    // Public users only receive watchlist data; owner gets merged watchlist + portfolio.
-    const sheetStocks = await fetchAllSheetStocks(forceRefresh);
-    const portfolioStocks = isOwner ? await fetchPortfolioStocks(forceRefresh) : [];
+    const [usWatchlist, indianWatchlist, usPortfolio, indianPortfolio] = await Promise.all([
+      fetchAllSheetStocks(forceRefresh),
+      getIndianWatchlist(forceRefresh),
+      isOwner ? fetchPortfolioStocks(forceRefresh) : Promise.resolve([]),
+      isOwner ? getIndianPortfolio(forceRefresh) : Promise.resolve([]),
+    ]);
 
-    // 2. Build Maps
-    const watchlistMap = new Map(sheetStocks.map(s => [s.ticker, s]));
-    const portfolioMap = new Map(portfolioStocks.map(s => [s.ticker, s]));
+    const tickers = new Set<string>([
+      ...usWatchlist.map((stock) => stock.ticker),
+      ...indianWatchlist.map((stock) => stock.ticker),
+      ...(isOwner ? usPortfolio.map((stock) => stock.ticker) : []),
+      ...(isOwner ? indianPortfolio.map((stock) => stock.ticker) : []),
+    ]);
 
-    // 3. Get unique tickers
-    const allTickers = new Set([...watchlistMap.keys(), ...portfolioMap.keys()]);
-    
-    // 4. Fetch live quotes for all
-    const liveQuotes = await getBatchQuotes(Array.from(allTickers));
+    const liveQuotes = await getBatchQuotes(Array.from(tickers));
+    const usStocks = mergeUSData(usWatchlist, usPortfolio, liveQuotes, user);
+    const indianStocks = mergeIndianData(indianWatchlist, indianPortfolio, liveQuotes, user);
+    const merged: MergedStock[] = [...usStocks, ...indianStocks];
 
-    // 5. Merge logic (Full Outer Join)
-    const merged: MergedStock[] = [];
-
-    for (const ticker of allTickers) {
-      const wData = watchlistMap.get(ticker);
-      const pData = portfolioMap.get(ticker);
-      const live = liveQuotes.get(ticker) ?? null;
-
-      // Tags logic
-      const isInWatchlist = !!wData;
-      const isInPortfolio = !!pData;
-      const tags: string[] = [];
-      if (isInWatchlist && isInPortfolio) tags.push('WATCHLIST + PORTFOLIO');
-      else if (isInWatchlist) tags.push('WATCHLIST ONLY');
-      else if (isInPortfolio) tags.push('PORTFOLIO ONLY');
-
-      // Intelligence Theme
-      const name = wData?.name || pData?.name || live?.shortName || ticker;
-      const description = wData?.description || '';
-      const suggestion = suggestTheme({ name, description });
-
-      const quantity = pData?.quantity;
-      const avgBuyPrice = pData?.avgBuyPrice;
-      const currentValue = quantity && live?.price ? quantity * live.price : undefined;
-      const pnl = quantity && avgBuyPrice && live?.price
-        ? (live.price - avgBuyPrice) * quantity
-        : undefined;
-
-      merged.push({
-        ticker,
-        name,
-        category: wData?.category || 'Uncategorized',
-        sheetTab: wData?.sheetTab || 'Portfolio Only',
-        description,
-        marketCapSheet: wData?.marketCapSheet ?? null,
-        currentPriceSheet: wData?.currentPriceSheet ?? null,
-        fairPrice: wData?.fairPrice ?? null,
-        potentialGain: wData?.potentialGain ?? null,
-        gain1W: wData?.gain1W ?? null,
-        gain1M: wData?.gain1M ?? null,
-        gain6M: wData?.gain6M ?? null,
-        gain1Y: wData?.gain1Y ?? null,
-        gain3Y: wData?.gain3Y ?? null,
-        live,
-        convictionScore: 5, // default
-        alertThreshold: null,
-        tags: isOwner ? tags : tags.filter((tag) => tag !== 'PORTFOLIO ONLY' && tag !== 'WATCHLIST + PORTFOLIO'),
-        isInWatchlist,
-        isInPortfolio: isOwner ? isInPortfolio : (SHOW_PORTFOLIO_FLAG ? isInPortfolio : false),
-        portfolioData: (isOwner && pData) ? {
-          quantity: pData.quantity,
-          avgBuyPrice: pData.avgBuyPrice,
-          investedValue: pData.investedValue
-        } : undefined,
-        quantity: isOwner ? quantity : undefined,
-        avgBuyPrice: isOwner ? avgBuyPrice : undefined,
-        currentValue: isOwner ? currentValue : undefined,
-        pnl: isOwner ? pnl : undefined,
-        originalTheme: wData?.category,
-        suggestedTheme: suggestion?.theme,
-        themeConfidence: suggestion?.confidence
-      });
-    }
-
-    // 6. Build summary stats
     const withLive = merged.filter(s => s.live?.price);
     const gainers = [...withLive].sort((a, b) => (b.live!.changePercent) - (a.live!.changePercent));
     const summary = {

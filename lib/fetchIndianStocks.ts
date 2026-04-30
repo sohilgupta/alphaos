@@ -1,0 +1,194 @@
+import type { PortfolioStock, SheetStock } from '@/lib/types';
+
+const INDIAN_SHEET_ID = '1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM';
+const CACHE_TTL = 5 * 60 * 1000;
+
+const INDIAN_WATCHLIST_SHEETS = [
+  { sheet: 'Stock Watchlist 2', categoryFallback: 'Defence Stocks' },
+  { sheet: 'Stock Watchlist 3', categoryFallback: 'Infrastructure Stocks' },
+];
+
+let portfolioCache: { stocks: PortfolioStock[]; fetchedAt: number } | null = null;
+let watchlistCache: { stocks: SheetStock[]; fetchedAt: number } | null = null;
+
+type GoogleCell = { v?: string | number | null; f?: string };
+type GoogleTable = {
+  cols: { label: string }[];
+  rows: { c: Array<GoogleCell | null> }[];
+};
+
+function gvizUrl(sheet: string) {
+  const encodedSheet = encodeURIComponent(sheet);
+  return `https://docs.google.com/spreadsheets/d/${INDIAN_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodedSheet}`;
+}
+
+async function fetchGvizTable(sheet: string): Promise<GoogleTable> {
+  const res = await fetch(gvizUrl(sheet), { next: { revalidate: 300 } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const text = await res.text();
+  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
+  if (!match) throw new Error(`Unexpected Google Sheets response for "${sheet}"`);
+
+  const parsed = JSON.parse(match[1]);
+  if (parsed.status !== 'ok') throw new Error(parsed.errors?.[0]?.detailed_message || `Failed to load "${sheet}"`);
+  return parsed.table;
+}
+
+function normalizeHeader(value: string) {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function headerIndex(headers: string[], ...matches: string[]) {
+  const lowered = matches.map(normalizeHeader);
+  return headers.findIndex((header) => lowered.some((match) => header.includes(match)));
+}
+
+function cellValue(row: Array<GoogleCell | null>, index: number) {
+  if (index < 0) return null;
+  const cell = row[index];
+  return cell?.v ?? cell?.f ?? null;
+}
+
+function parseNumber(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+  const cleaned = value.toString().replace(/[%,$,₹]/g, '').trim();
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parsePercent(value: unknown): number | null {
+  const parsed = parseNumber(value);
+  if (parsed == null) return null;
+  return Math.abs(parsed) <= 2 ? parsed * 100 : parsed;
+}
+
+function normalizeIndianTicker(raw: unknown): string | null {
+  if (raw == null) return null;
+
+  const value = raw.toString().trim().toUpperCase();
+  if (!value) return null;
+
+  if (value.startsWith('NSE:')) return `${value.slice(4)}.NS`;
+  if (value.startsWith('BOM:') || value.startsWith('BSE:')) return `${value.slice(4)}.BO`;
+  if (/^\d+$/.test(value)) return `${value}.BO`;
+  if (value.endsWith('.NS') || value.endsWith('.BO')) return value;
+
+  return `${value}.NS`;
+}
+
+function categoryFromFirstHeader(header: string, fallback: string) {
+  const cleaned = header.replace(/^stock\s+/i, '').trim();
+  return cleaned || fallback;
+}
+
+function rowValues(row: { c: Array<GoogleCell | null> }) {
+  return row.c;
+}
+
+export async function getIndianPortfolio(forceRefresh = false): Promise<PortfolioStock[]> {
+  if (!forceRefresh && portfolioCache && Date.now() - portfolioCache.fetchedAt < CACHE_TTL) {
+    return portfolioCache.stocks;
+  }
+
+  const stocks: PortfolioStock[] = [];
+
+  try {
+    const table = await fetchGvizTable('Trendlyne portfolio');
+    const headers = table.cols.map((col) => normalizeHeader(col.label));
+    const idxTicker = headerIndex(headers, 'nsecode', 'bsecode', 'stock code');
+    const idxName = headerIndex(headers, 'stock name');
+    const idxQuantity = headerIndex(headers, 'quantity');
+    const idxAvgBuyPrice = headerIndex(headers, 'avg. buy price', 'avg buy price', 'purchase price');
+    const idxInvested = headerIndex(headers, 'invested amount', 'starting value', 'invested value');
+
+    for (const row of table.rows) {
+      const values = rowValues(row);
+      const ticker = normalizeIndianTicker(cellValue(values, idxTicker));
+      if (!ticker) continue;
+
+      const quantity = parseNumber(cellValue(values, idxQuantity)) ?? 0;
+      const avgBuyPrice = parseNumber(cellValue(values, idxAvgBuyPrice)) ?? 0;
+      let investedValue = parseNumber(cellValue(values, idxInvested)) ?? 0;
+      if (!investedValue && quantity > 0 && avgBuyPrice > 0) {
+        investedValue = quantity * avgBuyPrice;
+      }
+
+      stocks.push({
+        ticker,
+        name: cellValue(values, idxName)?.toString().trim() || ticker,
+        quantity,
+        avgBuyPrice,
+        investedValue,
+      });
+    }
+  } catch (error) {
+    console.error('Failed to fetch Indian portfolio:', error);
+  }
+
+  portfolioCache = { stocks, fetchedAt: Date.now() };
+  return stocks;
+}
+
+export async function getIndianWatchlist(forceRefresh = false): Promise<SheetStock[]> {
+  if (!forceRefresh && watchlistCache && Date.now() - watchlistCache.fetchedAt < CACHE_TTL) {
+    return watchlistCache.stocks;
+  }
+
+  const allStocks: SheetStock[] = [];
+
+  await Promise.allSettled(
+    INDIAN_WATCHLIST_SHEETS.map(async ({ sheet, categoryFallback }) => {
+      const table = await fetchGvizTable(sheet);
+      const headers = table.cols.map((col) => normalizeHeader(col.label));
+      const rawHeaders = table.cols.map((col) => col.label);
+      const idxName = 0;
+      const idxTicker = headerIndex(headers, 'stock code');
+      const idxCurrentPrice = headerIndex(headers, 'current price');
+      const idxFairPrice = headerIndex(headers, 'fair price', 'intrinsic price');
+      const idxPotential = headerIndex(headers, 'potential gain/fall');
+      const idx1W = headerIndex(headers, '1 week');
+      const idx1M = headerIndex(headers, '1 month');
+      const idx6M = headerIndex(headers, '6 month');
+      const idx1Y = headerIndex(headers, '1 year');
+      const idx3Y = headerIndex(headers, '3 year');
+      const category = categoryFromFirstHeader(rawHeaders[0] || '', categoryFallback);
+
+      for (const row of table.rows) {
+        const values = rowValues(row);
+        const ticker = normalizeIndianTicker(cellValue(values, idxTicker));
+        if (!ticker) continue;
+
+        allStocks.push({
+          ticker,
+          name: cellValue(values, idxName)?.toString().trim() || ticker,
+          category,
+          sheetTab: sheet,
+          description: '',
+          marketCapSheet: null,
+          currentPriceSheet: parseNumber(cellValue(values, idxCurrentPrice)),
+          fairPrice: parseNumber(cellValue(values, idxFairPrice)),
+          potentialGain: parsePercent(cellValue(values, idxPotential)),
+          gain1W: parsePercent(cellValue(values, idx1W)),
+          gain1M: parsePercent(cellValue(values, idx1M)),
+          gain6M: parsePercent(cellValue(values, idx6M)),
+          gain1Y: parsePercent(cellValue(values, idx1Y)),
+          gain3Y: parsePercent(cellValue(values, idx3Y)),
+          region: 'INDIA',
+        });
+      }
+    })
+  );
+
+  const seen = new Set<string>();
+  const deduped = allStocks.filter((stock) => {
+    if (seen.has(stock.ticker)) return false;
+    seen.add(stock.ticker);
+    return true;
+  });
+
+  watchlistCache = { stocks: deduped, fetchedAt: Date.now() };
+  return deduped;
+}

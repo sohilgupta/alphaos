@@ -100,6 +100,7 @@ function parseTabCsv(csvText: string, tabName: string): SheetStock[] {
         gain6M: parsePercent(idx6M >= 0 ? row[idx6M] : undefined),
         gain1Y: parsePercent(idx1Y >= 0 ? row[idx1Y] : undefined),
         gain3Y: parsePercent(idx3Y >= 0 ? row[idx3Y] : undefined),
+        region: 'US',
       });
     }
   }
@@ -175,12 +176,12 @@ export async function fetchPortfolioStocks(forceRefresh = false): Promise<import
       return [];
     }
 
-    const result = Papa.parse<string[]>(text, {
+    const result = Papa.parse<Record<string, string | undefined>>(text, {
       skipEmptyLines: true,
       header: true,
     });
 
-    const rows = result.data as any[];
+    const rows = result.data;
 
     for (const row of rows) {
       const tickerRaw = row['Stock Code'] || row['Stock code'] || row['stock code'];

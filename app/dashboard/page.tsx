@@ -7,14 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import StockTable from '@/components/dashboard/StockTable';
 import HeatmapView from '@/components/dashboard/HeatmapView';
-import { formatPercent, formatPrice, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPercent, formatStockPrice, getChangeBg, getChangeColor } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/components/providers/AuthProvider';
 
-async function fetchStocks() {
-  const res = await fetch('/api/stocks', { next: { revalidate: 0 } });
+async function fetchStocks(forceRefresh = false) {
+  const res = await fetch(`/api/stocks${forceRefresh ? '?refresh=true' : ''}`, { next: { revalidate: 0 } });
   if (!res.ok) throw new Error('Failed to fetch');
   return res.json();
 }
@@ -23,26 +23,34 @@ export default function DashboardPage() {
   const router = useRouter();
   const { role } = useAuth();
   const isOwner = role === 'owner';
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['stocks'],
-    queryFn: fetchStocks,
+  const [refreshToken, setRefreshToken] = useState(0);
+  const { data, isLoading, isError, isFetching } = useQuery({
+    queryKey: ['stocks', refreshToken],
+    queryFn: () => fetchStocks(refreshToken > 0),
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const [activeTab, setActiveTab] = useState('All');
+  const [region, setRegion] = useState<'US' | 'INDIA'>('US');
   const [view, setView] = useState<'table' | 'heatmap'>('table');
-  const [viewFilter, setViewFilter] = useState<'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP'>('ALL');
+  const [viewFilter, setViewFilter] = useState<'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP'>(() => {
+    if (typeof window === 'undefined') return 'ALL';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('filter')?.toUpperCase() === 'PORTFOLIO' ? 'PORTFOLIO' : 'ALL';
+  });
 
-  const stocks: MergedStock[] = data?.stocks ?? [];
-  const summary = data?.summary;
+  const stocks = useMemo<MergedStock[]>(() => data?.stocks ?? [], [data?.stocks]);
+
+  const filteredByRegion = useMemo(() => stocks.filter(s => s.region === region), [stocks, region]);
 
   const filteredByView = useMemo(() => {
     switch (viewFilter) {
-      case 'WATCHLIST': return stocks.filter(s => s.isInWatchlist && !s.isInPortfolio);
-      case 'PORTFOLIO': return isOwner ? stocks.filter(s => !s.isInWatchlist && s.isInPortfolio) : stocks;
-      case 'OVERLAP': return isOwner ? stocks.filter(s => s.isInWatchlist && s.isInPortfolio) : stocks;
-      default: return stocks;
+      case 'WATCHLIST': return filteredByRegion.filter(s => s.isInWatchlist && !s.isInPortfolio);
+      case 'PORTFOLIO': return isOwner ? filteredByRegion.filter(s => !s.isInWatchlist && s.isInPortfolio) : filteredByRegion;
+      case 'OVERLAP': return isOwner ? filteredByRegion.filter(s => s.isInWatchlist && s.isInPortfolio) : filteredByRegion;
+      default: return filteredByRegion;
     }
-  }, [stocks, viewFilter, isOwner]);
+  }, [filteredByRegion, viewFilter, isOwner]);
 
   // Build tab list from unique categories of the currently filtered view
   const tabs = useMemo(() => {
@@ -78,38 +86,56 @@ export default function DashboardPage() {
   }, [filteredByView]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6 max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-2xl font-800 text-foreground tracking-tight">AlphaOS Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? 'Loading…' : `${filteredByView.length} stocks across ${tabs.length - 1} categories`}
+            {isLoading ? 'Loading…' : `${filteredByView.length} ${region === 'US' ? 'US' : 'Indian'} stocks across ${tabs.length - 1} categories`}
           </p>
         </div>
-        <div className="flex gap-2">
-          <div className="flex bg-secondary/50 p-1 rounded-lg border border-white/8 mr-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="flex bg-secondary/50 p-1 rounded-lg border border-white/8 overflow-x-auto w-full sm:w-auto">
+            {[
+              { id: 'US', label: '🇺🇸 US Stocks' },
+              { id: 'INDIA', label: '🇮🇳 Indian Stocks' },
+            ].map(option => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  setRegion(option.id as 'US' | 'INDIA');
+                  setActiveTab('All');
+                  setViewFilter('ALL');
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-600 transition-colors ${region === option.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex bg-secondary/50 p-1 rounded-lg border border-white/8 overflow-x-auto w-full sm:w-auto">
             {[
               { id: 'ALL', label: 'All', icon: '' },
-              { id: 'WATCHLIST', label: 'Watchlist', icon: '🧠' },
+              { id: 'WATCHLIST', label: 'Watchlist', icon: '' },
               ...(isOwner ? [
-                { id: 'PORTFOLIO', label: 'Portfolio', icon: '💰' },
-                { id: 'OVERLAP', label: 'Conviction', icon: '🔥' }
+                { id: 'PORTFOLIO', label: 'Portfolio', icon: '' },
+                { id: 'OVERLAP', label: 'Conviction', icon: '' }
               ] : [])
             ].map(f => (
               <button
                 key={f.id}
-                onClick={() => setViewFilter(f.id as any)}
-                className={`px-3 py-1.5 rounded-md text-xs font-500 transition-colors ${viewFilter === f.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setViewFilter(f.id as 'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP')}
+                className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-500 transition-colors ${viewFilter === f.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 {f.icon && <span className="mr-1">{f.icon}</span>}{f.label}
               </button>
             ))}
           </div>
           <button
-            onClick={() => refetch()}
+            onClick={() => setRefreshToken(Date.now())}
             disabled={isFetching}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 border border-white/8 transition-all"
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 border border-white/8 transition-all"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
             {isFetching ? 'Refreshing…' : 'Refresh'}
@@ -185,11 +211,11 @@ export default function DashboardPage() {
 
       {/* Gainers / Losers strip */}
       {!isLoading && topGainers.length > 0 && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
-            { title: '🚀 Top Gainers (Today)', items: topGainers, positive: true },
-            { title: '📉 Top Losers (Today)', items: topLosers, positive: false },
-          ].map(({ title, items, positive }) => (
+            { title: 'Top Gainers (Today)', items: topGainers, positive: true },
+            { title: 'Top Losers (Today)', items: topLosers, positive: false },
+          ].map(({ title, items }) => (
             <div key={title} className="glass-card p-4">
               <h3 className="text-sm font-600 text-muted-foreground mb-3">{title}</h3>
               <div className="space-y-2">
@@ -204,7 +230,7 @@ export default function DashboardPage() {
                       <span className="text-xs text-muted-foreground truncate max-w-[100px]">{s.live?.shortName || s.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs tabular-nums text-muted-foreground">{formatPrice(s.live?.price ?? null)}</span>
+                      <span className="text-xs tabular-nums text-muted-foreground">{formatStockPrice(s.live?.price ?? null, s.region)}</span>
                       <Badge className={`text-xs font-600 ${getChangeBg(s.live?.changePercent ?? null)}`} variant="secondary">
                         {formatPercent(s.live?.changePercent ?? null)}
                       </Badge>

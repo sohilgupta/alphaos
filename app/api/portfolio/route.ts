@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { fetchPortfolioStocks } from '@/lib/google-sheets';
-import { isAuthenticated } from '@/lib/auth';
+import { requireOwner } from '@/lib/auth';
+import type { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET(request: Request) {
-  if (!(await isAuthenticated())) {
+export async function GET(request: NextRequest) {
+  try {
+    await requireOwner(request);
+  } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

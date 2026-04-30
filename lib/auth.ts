@@ -54,6 +54,18 @@ export async function getUserFromRequest(req: NextRequest): Promise<User | null>
   return { id: 'owner', role: 'owner' };
 }
 
+export async function getUser(req: NextRequest): Promise<User | null> {
+  return getUserFromRequest(req);
+}
+
+export async function requireOwner(req: NextRequest): Promise<User> {
+  const user = await getUser(req);
+  if (!user || user.role !== 'owner') {
+    throw new Error('Unauthorized');
+  }
+  return user;
+}
+
 export async function getCurrentUser(): Promise<User | null> {
   if (!(await isAuthenticated())) return null;
   return { id: 'owner', role: 'owner' };

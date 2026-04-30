@@ -16,6 +16,7 @@ export interface SheetStock {
   gain6M: number | null;
   gain1Y: number | null;
   gain3Y: number | null;
+  region?: Region;
 }
 
 export interface LiveQuote {
@@ -68,6 +69,7 @@ export interface PortfolioStock {
 }
 
 export type UserRole = 'public' | 'owner';
+export type Region = 'US' | 'INDIA';
 
 export interface User {
   id: string;
@@ -77,6 +79,7 @@ export interface User {
 export interface Stock {
   ticker: string;
   name: string;
+  region: Region;
   theme: string;
   notes?: string;
   isWatchlist: boolean;
@@ -92,6 +95,7 @@ export interface Stock {
 export interface MergedStock {
   ticker: string;
   name: string;
+  region: Region;
   category: string;
   sheetTab: string;
   description: string;
