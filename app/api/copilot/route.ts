@@ -25,7 +25,7 @@ interface CopilotRequestBody {
 }
 
 const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
-const NVIDIA_MODEL = 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
+const NVIDIA_MODEL = 'minimaxai/minimax-m1';
 
 const SYSTEM_PROMPT = `You are an AI investment analyst.
 
