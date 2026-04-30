@@ -207,6 +207,42 @@ export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): 
   }
 }
 
+function computeReturnFromHistory(currentPrice: number, points: ChartDataPoint[]): number | null {
+  if (!currentPrice || !points.length) return null;
+  const start = points[0].close;
+  if (!start || start === 0) return null;
+  return ((currentPrice - start) / start) * 100;
+}
+
+function closestPointToDate(points: ChartDataPoint[], target: Date): ChartDataPoint | null {
+  if (!points.length) return null;
+  return points.reduce((closest, point) => {
+    const pointDate = new Date(point.date).getTime();
+    const bestDate = new Date(closest.date).getTime();
+    return Math.abs(pointDate - target.getTime()) < Math.abs(bestDate - target.getTime()) ? point : closest;
+  });
+}
+
+export async function getHistoricalReturns(ticker: string, currentPrice: number) {
+  const [week, month, year, fiveYear] = await Promise.all([
+    getHistory(ticker, '5d'),
+    getHistory(ticker, '1mo'),
+    getHistory(ticker, '1y'),
+    getHistory(ticker, '5y'),
+  ]);
+
+  const threeYearsAgo = new Date();
+  threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+  const threeYearPoint = closestPointToDate(fiveYear, threeYearsAgo);
+
+  return {
+    gain1W: computeReturnFromHistory(currentPrice, week),
+    gain1M: computeReturnFromHistory(currentPrice, month),
+    gain1Y: computeReturnFromHistory(currentPrice, year),
+    gain3Y: threeYearPoint ? ((currentPrice - threeYearPoint.close) / threeYearPoint.close) * 100 : null,
+  };
+}
+
 function getPeriodStartDate(period: HistoryPeriod): Date {
   const now = new Date();
   switch (period) {

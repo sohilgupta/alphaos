@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getStockDetail } from '@/lib/yahoo-finance';
+import { getHistoricalReturns, getStockDetail } from '@/lib/yahoo-finance';
 import { fetchAllSheetStocks, fetchPortfolioStocks } from '@/lib/google-sheets';
 import { getIndianPortfolio, getIndianWatchlist } from '@/lib/fetchIndianStocks';
 import { suggestTheme } from '@/lib/intelligence';
@@ -31,10 +31,27 @@ export async function GET(
 
     const sheetStocks = [...usSheetStocks, ...indianSheetStocks];
     const portfolioStocks = isOwner ? [...usPortfolioStocks, ...indianPortfolioStocks] : [];
-    const sheetData = sheetStocks.find(s => s.ticker === upperTicker) ?? null;
+    let sheetData = sheetStocks.find(s => s.ticker === upperTicker) ?? null;
     const portfolioData = portfolioStocks.find(s => s.ticker === upperTicker) ?? null;
 
-    // Intelligence theme using full detail if available
+    if (sheetData && detail?.price) {
+      const missing1W = sheetData.gain1W == null;
+      const missing1M = sheetData.gain1M == null;
+      const missing1Y = sheetData.gain1Y == null;
+      const missing3Y = sheetData.gain3Y == null;
+
+      if (missing1W || missing1M || missing1Y || missing3Y) {
+        const history = await getHistoricalReturns(upperTicker, detail.price);
+        sheetData = {
+          ...sheetData,
+          gain1W: sheetData.gain1W ?? history.gain1W,
+          gain1M: sheetData.gain1M ?? history.gain1M,
+          gain1Y: sheetData.gain1Y ?? history.gain1Y,
+          gain3Y: sheetData.gain3Y ?? history.gain3Y,
+        };
+      }
+    }
+
     const name = sheetData?.name || portfolioData?.name || detail?.shortName || upperTicker;
     const suggestion = detail 
       ? suggestTheme({ name, description: detail.description ?? sheetData?.description ?? '', sector: detail.sector ?? '', industry: detail.industry ?? '' })

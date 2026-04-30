@@ -9,7 +9,7 @@ import PriceChart from '@/components/stock/PriceChart';
 import KeyStats from '@/components/stock/KeyStats';
 import NewsFeed from '@/components/stock/NewsFeed';
 import ConvictionScore from '@/components/stock/ConvictionScore';
-import { formatPrice, formatPercent, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPrice, formatStockPrice, formatPercent, getChangeBg, getChangeColor } from '@/lib/format';
 import { StockDetail, SheetStock, PortfolioStock } from '@/lib/types';
 import { ThemeSuggestion } from '@/lib/intelligence';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -94,6 +94,7 @@ export default function StockDetailPage() {
   const portfolioData: PortfolioStock | null = data?.portfolioData ?? null;
   const suggestion: ThemeSuggestion | null = data?.suggestion ?? null;
 
+  const region = sheetData?.region || (detail?.currency === 'INR' ? 'INDIA' : 'US');
   const price = detail?.price ?? 0;
   const changePercent = detail?.changePercent ?? 0;
 
@@ -154,7 +155,7 @@ export default function StockDetailPage() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-4xl font-800 tabular-nums text-foreground">{formatPrice(price)}</div>
+              <div className="text-4xl font-800 tabular-nums text-foreground">{formatStockPrice(price, region)}</div>
               <div className="mt-1 flex items-center justify-end gap-2">
                 <Badge className={`text-sm font-700 px-3 py-1 ${getChangeBg(changePercent)}`} variant="secondary">
                   {formatPercent(changePercent)}
@@ -165,7 +166,7 @@ export default function StockDetailPage() {
               </div>
               {sheetData?.fairPrice && (
                 <div className="text-xs text-muted-foreground mt-2">
-                  Fair Value: <span className="text-foreground font-600">{formatPrice(sheetData.fairPrice)}</span>
+                  Fair Value: <span className="text-foreground font-600">{formatStockPrice(sheetData.fairPrice, region)}</span>
                   {sheetData.potentialGain != null && (
                     <span className={`ml-1 ${getChangeColor(sheetData.potentialGain)}`}>
                       ({formatPercent(sheetData.potentialGain)})
@@ -201,11 +202,11 @@ export default function StockDetailPage() {
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Avg Buy Price</div>
-              <div className="text-2xl font-800 tabular-nums text-foreground">{formatPrice(portfolioData.avgBuyPrice)}</div>
+              <div className="text-2xl font-800 tabular-nums text-foreground">{formatStockPrice(portfolioData.avgBuyPrice, region)}</div>
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Invested</div>
-              <div className="text-2xl font-800 tabular-nums text-foreground">{formatPrice(portfolioData.investedValue)}</div>
+              <div className="text-2xl font-800 tabular-nums text-foreground">{formatStockPrice(portfolioData.investedValue, region)}</div>
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">P&L</div>
@@ -215,7 +216,7 @@ export default function StockDetailPage() {
                 return (
                   <div>
                     <div className={`text-2xl font-800 tabular-nums ${getChangeColor(plValue)}`}>
-                      {plValue >= 0 ? '+' : ''}{formatPrice(plValue)}
+                      {plValue >= 0 ? '+' : ''}{formatStockPrice(plValue, region)}
                     </div>
                     <div className={`text-sm font-600 ${getChangeColor(plPercent)}`}>
                       {formatPercent(plPercent)}
