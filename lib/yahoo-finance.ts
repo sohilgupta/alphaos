@@ -3,28 +3,22 @@
 
 import YahooFinance from 'yahoo-finance2';
 import { LiveQuote, StockDetail, ChartDataPoint, NewsItem } from './types';
+import { getCache, setCache } from './cache';
 
-// Singleton instance
 const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-// In-memory caches
-const quoteCache = new Map<string, { data: LiveQuote; ts: number }>();
-const detailCache = new Map<string, { data: StockDetail; ts: number }>();
-const historyCache = new Map<string, { data: ChartDataPoint[]; ts: number }>();
+const QUOTE_TTL   = 5 * 60 * 1000;   // 5 min
+const DETAIL_TTL  = 60 * 60 * 1000;  // 1 hr
+const HISTORY_TTL = 60 * 60 * 1000;  // 1 hr
 
-const QUOTE_TTL = 5 * 60 * 1000;    // 5 min
-const DETAIL_TTL = 60 * 60 * 1000;  // 1 hr
-const HISTORY_TTL = 60 * 60 * 1000; // 1 hr
-
-// Batch quotes for multiple tickers
 export async function getBatchQuotes(tickers: string[]): Promise<Map<string, LiveQuote>> {
   const result = new Map<string, LiveQuote>();
   const toFetch: string[] = [];
 
   for (const t of tickers) {
-    const cached = quoteCache.get(t);
-    if (cached && Date.now() - cached.ts < QUOTE_TTL) {
-      result.set(t, cached.data);
+    const cached = getCache<LiveQuote>(`quote:${t}`);
+    if (cached) {
+      result.set(t, cached);
     } else {
       toFetch.push(t);
     }
@@ -32,12 +26,10 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
 
   if (toFetch.length === 0) return result;
 
-  // Process in chunks of 20
   const chunkSize = 20;
   for (let i = 0; i < toFetch.length; i += chunkSize) {
     const chunk = toFetch.slice(i, i + chunkSize);
     try {
-      // yahoo-finance2 v3: quote() accepts an array and returns an array
       const quotes = await yf.quote(chunk);
       const quotesArr = Array.isArray(quotes) ? quotes : [quotes];
 
@@ -62,14 +54,13 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
           industry: null,
           fetchedAt: Date.now(),
         };
-        quoteCache.set(q.symbol, { data: live, ts: Date.now() });
+        setCache(`quote:${q.symbol}`, live, QUOTE_TTL);
         result.set(q.symbol, live);
       }
     } catch (err) {
       console.error(`Failed to fetch quotes for chunk [${chunk.join(',')}]:`, err);
     }
 
-    // Delay between chunks to avoid rate limiting
     if (i + chunkSize < toFetch.length) {
       await new Promise(r => setTimeout(r, 300));
     }
@@ -78,10 +69,9 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
   return result;
 }
 
-// Single ticker full detail
 export async function getStockDetail(ticker: string): Promise<StockDetail | null> {
-  const cached = detailCache.get(ticker);
-  if (cached && Date.now() - cached.ts < DETAIL_TTL) return cached.data;
+  const cached = getCache<StockDetail>(`detail:${ticker}`);
+  if (cached) return cached;
 
   try {
     const [summaryResult, quoteResult] = await Promise.allSettled([
@@ -133,7 +123,7 @@ export async function getStockDetail(ticker: string): Promise<StockDetail | null
       employees: (profile as any)?.fullTimeEmployees ?? null,
     };
 
-    detailCache.set(ticker, { data, ts: Date.now() });
+    setCache(`detail:${ticker}`, data, DETAIL_TTL);
     return data;
   } catch (err) {
     console.error(`Failed to fetch detail for ${ticker}:`, err);
@@ -144,21 +134,21 @@ export async function getStockDetail(ticker: string): Promise<StockDetail | null
 type HistoryPeriod = '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5y' | 'max';
 
 const PERIOD_INTERVAL: Record<HistoryPeriod, '1m' | '5m' | '1h' | '1d' | '1wk' | '1mo'> = {
-  '1d': '5m',
-  '5d': '1h',
+  '1d':  '5m',
+  '5d':  '1h',
   '1mo': '1d',
   '3mo': '1d',
   '6mo': '1d',
-  '1y': '1d',
-  '2y': '1wk',
-  '5y': '1mo',
+  '1y':  '1d',
+  '2y':  '1wk',
+  '5y':  '1mo',
   'max': '1mo',
 };
 
 export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): Promise<ChartDataPoint[]> {
-  const cacheKey = `${ticker}-${period}`;
-  const cached = historyCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < HISTORY_TTL) return cached.data;
+  const cacheKey = `history:${ticker}:${period}`;
+  const cached = getCache<ChartDataPoint[]>(cacheKey);
+  if (cached) return cached;
 
   try {
     const interval = PERIOD_INTERVAL[period] || '1d';
@@ -174,7 +164,6 @@ export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): 
     let points: ChartDataPoint[] = [];
 
     if (Array.isArray(quotes) && quotes.length > 0 && quotes[0]?.date) {
-      // Standard format
       points = quotes
         .filter((q: any) => q && q.close != null)
         .map((q: any) => ({
@@ -186,7 +175,6 @@ export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): 
           volume: q.volume ?? 0,
         }));
     } else if (timestamps.length > 0 && Array.isArray(quotes)) {
-      // Timestamp-indexed format
       points = timestamps
         .map((ts: number, i: number) => ({
           date: new Date(ts * 1000).toISOString(),
@@ -199,7 +187,7 @@ export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): 
         .filter((p: ChartDataPoint) => p.close > 0);
     }
 
-    historyCache.set(cacheKey, { data: points, ts: Date.now() });
+    setCache(cacheKey, points, HISTORY_TTL);
     return points;
   } catch (err) {
     console.error(`Failed to fetch history for ${ticker} (${period}):`, err);
@@ -277,7 +265,7 @@ export async function getNews(ticker: string): Promise<NewsItem[]> {
 export function formatMarketCap(cap: number | null): string {
   if (cap == null) return '—';
   if (cap >= 1e12) return `$${(cap / 1e12).toFixed(2)}T`;
-  if (cap >= 1e9) return `$${(cap / 1e9).toFixed(2)}B`;
-  if (cap >= 1e6) return `$${(cap / 1e6).toFixed(2)}M`;
+  if (cap >= 1e9)  return `$${(cap / 1e9).toFixed(2)}B`;
+  if (cap >= 1e6)  return `$${(cap / 1e6).toFixed(2)}M`;
   return `$${cap.toLocaleString()}`;
 }

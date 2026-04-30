@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import StockTable from '@/components/dashboard/StockTable';
 import HeatmapView from '@/components/dashboard/HeatmapView';
+import CopilotInsights from '@/components/dashboard/CopilotInsights';
 import { formatPercent, formatStockPrice, getChangeBg, getChangeColor } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
@@ -27,7 +28,9 @@ export default function DashboardPage() {
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ['stocks', refreshToken],
     queryFn: () => fetchStocks(refreshToken > 0),
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 4 * 60 * 1000,      // reuse cached data for 4 min — no refetch on remount
+    refetchInterval: 5 * 60 * 1000, // background refresh every 5 min
+    refetchOnWindowFocus: false,    // don't refetch just because user switched tabs
   });
 
   const [activeTab, setActiveTab] = useState('All');
@@ -150,7 +153,7 @@ export default function DashboardPage() {
             ].map(f => (
               <button
                 key={f.id}
-                onClick={() => setViewFilter(f.id as 'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP')}
+                onClick={() => { setViewFilter(f.id as 'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP'); setActiveTab('All'); }}
                 className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-500 transition-colors ${viewFilter === f.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 {f.icon && <span className="mr-1">{f.icon}</span>}{f.label}
@@ -165,6 +168,9 @@ export default function DashboardPage() {
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
             {isFetching ? 'Refreshing…' : 'Refresh'}
           </button>
+          {isOwner && !isLoading && stocks.length > 0 && (
+            <CopilotInsights stocks={stocks} region={region} />
+          )}
         </div>
       </div>
 
