@@ -141,7 +141,7 @@ export default function CopilotInsights({ stocks, region }: Props) {
             {!loading && insights && (
               <div className="px-5 py-3 border-t border-white/8 flex items-center justify-between shrink-0">
                 <span className="text-xs text-muted-foreground">
-                  {insights.length} insight{insights.length !== 1 ? 's' : ''} · nemotron-ultra-253b
+                  {insights.length} insight{insights.length !== 1 ? 's' : ''} · minimax-m1
                 </span>
                 <button
                   onClick={runAnalysis}
