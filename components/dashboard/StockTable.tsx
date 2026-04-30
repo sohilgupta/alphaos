@@ -16,6 +16,7 @@ type Timeframe = '1D' | '1W' | '1M' | '3M' | '1Y';
 type ColSortKey = 'ticker' | 'name' | 'price' | 'marketCap' | 'pe';
 type SortKey = Timeframe | ColSortKey;
 type SortDir = 'asc' | 'desc';
+type QuickFilter = { type: 'top' | 'bottom'; timeframe: Timeframe } | null;
 
 interface Props {
   stocks: MergedStock[];
@@ -181,6 +182,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'table' | 'grid'>('table');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -188,14 +190,24 @@ export default function StockTable({ stocks, isLoading }: Props) {
   };
 
   const sorted = useMemo(() => {
-    const filtered = stocks.filter(s =>
+    const searched = stocks.filter(s =>
       !search ||
       s.ticker.toLowerCase().includes(search.toLowerCase()) ||
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.category.toLowerCase().includes(search.toLowerCase())
     );
 
-    return [...filtered].sort((a, b) => {
+    // Quick filter: rank by timeframe, slice top/bottom 10, then return as-is
+    if (quickFilter) {
+      return [...searched]
+        .sort((a, b) => {
+          const diff = getTimeframeValue(b, quickFilter.timeframe) - getTimeframeValue(a, quickFilter.timeframe);
+          return quickFilter.type === 'top' ? diff : -diff;
+        })
+        .slice(0, 10);
+    }
+
+    return [...searched].sort((a, b) => {
       let aVal: number | string;
       let bVal: number | string;
 
@@ -218,7 +230,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
       }
       return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
     });
-  }, [stocks, sortKey, sortDir, search]);
+  }, [stocks, sortKey, sortDir, search, quickFilter]);
 
   const renderSortIcon = (k: SortKey) => {
     if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
@@ -251,6 +263,44 @@ export default function StockTable({ stocks, isLoading }: Props) {
       </div>
     );
   }
+
+  // ─── Quick filter bar ─────────────────────────────────────────────────────────
+  const QuickFilterBar = () => (
+    <div className="flex items-center gap-1.5 overflow-x-auto">
+      <span className="shrink-0 text-xs text-muted-foreground/60 pr-1">Best:</span>
+      {TIMEFRAMES.map(({ label }) => {
+        const topActive = quickFilter?.type === 'top' && quickFilter.timeframe === label;
+        const botActive = quickFilter?.type === 'bottom' && quickFilter.timeframe === label;
+        return (
+          <div key={label} className="flex shrink-0 rounded-md overflow-hidden border border-white/8">
+            <button
+              onClick={() => setQuickFilter(topActive ? null : { type: 'top', timeframe: label })}
+              className={`px-2 py-1 text-xs font-600 transition-colors
+                ${topActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-secondary/40 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10'}`}
+            >
+              ↑{label}
+            </button>
+            <div className="w-px bg-white/8" />
+            <button
+              onClick={() => setQuickFilter(botActive ? null : { type: 'bottom', timeframe: label })}
+              className={`px-2 py-1 text-xs font-600 transition-colors
+                ${botActive ? 'bg-red-500/20 text-red-400' : 'bg-secondary/40 text-muted-foreground hover:text-red-400 hover:bg-red-500/10'}`}
+            >
+              ↓{label}
+            </button>
+          </div>
+        );
+      })}
+      {quickFilter && (
+        <button
+          onClick={() => setQuickFilter(null)}
+          className="shrink-0 px-2 py-1 rounded-md text-xs font-600 text-muted-foreground border border-white/8 bg-secondary/40 hover:text-foreground transition-colors"
+        >
+          ✕ Reset
+        </button>
+      )}
+    </div>
+  );
 
   // ─── Timeframe sort bar (shared between table + mobile) ─────────────────────
   const TimeframeSortBar = () => (
@@ -296,6 +346,8 @@ export default function StockTable({ stocks, isLoading }: Props) {
 
         <TimeframeSortBar />
 
+        <QuickFilterBar />
+
         <div className="hidden items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-white/8 md:flex">
           <button
             onClick={() => setView('table')}
@@ -311,7 +363,13 @@ export default function StockTable({ stocks, isLoading }: Props) {
           </button>
         </div>
 
-        <span className="text-xs text-muted-foreground">{sorted.length} stocks</span>
+        <span className="text-xs text-muted-foreground">
+          {quickFilter
+            ? <span className={quickFilter.type === 'top' ? 'text-emerald-400' : 'text-red-400'}>
+                {quickFilter.type === 'top' ? '↑' : '↓'} Top {sorted.length} · {quickFilter.timeframe}
+              </span>
+            : `${sorted.length} stocks`}
+        </span>
       </div>
 
       {view === 'grid' ? (
