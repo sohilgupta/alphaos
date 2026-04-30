@@ -1,5 +1,4 @@
 import { suggestTheme } from '@/lib/intelligence';
-import { getHistoricalReturns } from '@/lib/yahoo-finance';
 import type { LiveQuote, MergedStock, PortfolioStock, Region, SheetStock, User } from '@/lib/types';
 
 const PUBLIC_PORTFOLIO_KEYS = [
@@ -22,13 +21,13 @@ function sanitizeForPublic(stock: MergedStock): MergedStock {
   return sanitized;
 }
 
-async function mergeData(
+function mergeData(
   watchlist: SheetStock[],
   portfolio: PortfolioStock[],
   liveQuotes: Map<string, LiveQuote>,
   user: User | null,
   region: Region
-): Promise<MergedStock[]> {
+): MergedStock[] {
   const owner = isOwner(user);
   const watchlistMap = new Map(watchlist.map((stock) => [stock.ticker, stock]));
   const portfolioMap = owner ? new Map(portfolio.map((stock) => [stock.ticker, stock])) : new Map<string, PortfolioStock>();
@@ -36,8 +35,7 @@ async function mergeData(
     ? new Set([...watchlistMap.keys(), ...portfolioMap.keys()])
     : new Set(watchlistMap.keys());
 
-  const merged = await Promise.all(
-    Array.from(allTickers).map(async (ticker) => {
+  const merged = Array.from(allTickers).map((ticker) => {
       const wData = watchlistMap.get(ticker);
       const pData = portfolioMap.get(ticker);
       const live = liveQuotes.get(ticker) ?? null;
@@ -59,18 +57,10 @@ async function mergeData(
         ? (live.price - avgBuyPrice) * quantity
         : undefined;
 
-      let gain1W = wData?.gain1W ?? null;
-      let gain1M = wData?.gain1M ?? null;
-      let gain1Y = wData?.gain1Y ?? null;
-      let gain3Y = wData?.gain3Y ?? null;
-
-      if (live?.price && (gain1W == null || gain1M == null || gain1Y == null || gain3Y == null)) {
-        const computed = await getHistoricalReturns(ticker, live.price);
-        gain1W = gain1W ?? computed.gain1W;
-        gain1M = gain1M ?? computed.gain1M;
-        gain1Y = gain1Y ?? computed.gain1Y;
-        gain3Y = gain3Y ?? computed.gain3Y;
-      }
+      const gain1W = wData?.gain1W ?? null;
+      const gain1M = wData?.gain1M ?? null;
+      const gain1Y = wData?.gain1Y ?? null;
+      const gain3Y = wData?.gain3Y ?? null;
 
       const stock: MergedStock = {
         ticker,
@@ -109,26 +99,25 @@ async function mergeData(
       };
 
       return owner ? stock : sanitizeForPublic(stock);
-    })
-  );
+    });
 
   return merged;
 }
 
-export async function mergeUSData(
+export function mergeUSData(
   watchlist: SheetStock[],
   portfolio: PortfolioStock[],
   liveQuotes: Map<string, LiveQuote>,
   user: User | null
-) {
+): MergedStock[] {
   return mergeData(watchlist, portfolio, liveQuotes, user, 'US');
 }
 
-export async function mergeIndianData(
+export function mergeIndianData(
   watchlist: SheetStock[],
   portfolio: PortfolioStock[],
   liveQuotes: Map<string, LiveQuote>,
   user: User | null
-) {
+): MergedStock[] {
   return mergeData(watchlist, portfolio, liveQuotes, user, 'INDIA');
 }

@@ -49,8 +49,8 @@ export default function DashboardPage() {
 
   const filteredByView = useMemo(() => {
     switch (viewFilter) {
-      case 'WATCHLIST': return filteredByRegion.filter(s => s.isInWatchlist && !s.isInPortfolio);
-      case 'PORTFOLIO': return isOwner ? filteredByRegion.filter(s => !s.isInWatchlist && s.isInPortfolio) : filteredByRegion;
+      case 'WATCHLIST': return filteredByRegion.filter(s => s.isInWatchlist);
+      case 'PORTFOLIO': return isOwner ? filteredByRegion.filter(s => s.isInPortfolio) : filteredByRegion;
       case 'OVERLAP': return isOwner ? filteredByRegion.filter(s => s.isInWatchlist && s.isInPortfolio) : filteredByRegion;
       default: return filteredByRegion;
     }
