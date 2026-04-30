@@ -34,10 +34,13 @@ export default function DashboardPage() {
   const [region, setRegion] = useState<'US' | 'INDIA'>('US');
   const [view, setView] = useState<'table' | 'heatmap'>('table');
   const [viewFilter, setViewFilter] = useState<'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP'>(() => {
-    if (typeof window === 'undefined') return 'ALL';
+    if (typeof window === 'undefined') return isOwner ? 'PORTFOLIO' : 'ALL';
     const params = new URLSearchParams(window.location.search);
     const filter = params.get('filter')?.toUpperCase();
-    return ['ALL', 'WATCHLIST', 'PORTFOLIO', 'OVERLAP'].includes(filter ?? '') ? (filter as 'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP') : 'ALL';
+    if (['ALL', 'WATCHLIST', 'PORTFOLIO', 'OVERLAP'].includes(filter ?? '')) {
+      return filter as 'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP';
+    }
+    return isOwner ? 'PORTFOLIO' : 'ALL';
   });
 
   const stocks = useMemo<MergedStock[]>(() => data?.stocks ?? [], [data?.stocks]);
