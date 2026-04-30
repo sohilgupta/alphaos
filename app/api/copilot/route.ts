@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { requireOwner } from '@/lib/auth';
 import type { MergedStock } from '@/lib/types';
 
@@ -24,6 +23,9 @@ interface CopilotRequestBody {
   stocks: MergedStock[];
   region?: 'US' | 'INDIA';
 }
+
+const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
+const NVIDIA_MODEL = 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
 
 const SYSTEM_PROMPT = `You are an AI investment analyst.
 
@@ -127,9 +129,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'NVIDIA_API_KEY not configured' }, { status: 500 });
   }
 
   let body: CopilotRequestBody;
@@ -144,38 +146,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No stocks provided' }, { status: 400 });
   }
 
-  const client = new Anthropic({ apiKey });
   const userPrompt = buildUserPrompt(stocks, region);
 
   try {
-    const stream = await client.messages.stream({
-      model: 'claude-opus-4-7',
-      max_tokens: 1500,
-      thinking: { type: 'adaptive' },
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: userPrompt,
-              // @ts-ignore – cache_control is valid at runtime
-              cache_control: { type: 'ephemeral' },
-            },
-          ],
-        },
-      ],
+    const res = await fetch(NVIDIA_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.6,
+        top_p: 0.95,
+        max_tokens: 1500,
+      }),
     });
 
-    const message = await stream.finalMessage();
-
-    const textBlock = message.content.find(b => b.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      return NextResponse.json({ error: 'No text response from Claude' }, { status: 500 });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText);
+      console.error('NVIDIA API error:', errText);
+      return NextResponse.json({ error: 'NVIDIA API request failed' }, { status: 502 });
     }
 
-    const jsonMatch = textBlock.text.trim().match(/\{[\s\S]*\}/);
+    const result = await res.json();
+    const text: string = result.choices?.[0]?.message?.content ?? '';
+
+    const jsonMatch = text.trim().match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json({ error: 'Could not parse JSON from response' }, { status: 500 });
     }
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
     const insights = validateInsights(JSON.parse(jsonMatch[0]));
     return NextResponse.json({ insights }, { status: 200 });
   } catch (err) {
-    console.error('Copilot API error:', err);
+    console.error('Copilot error:', err);
     return NextResponse.json({ error: 'Failed to generate insights' }, { status: 500 });
   }
 }
