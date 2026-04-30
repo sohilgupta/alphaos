@@ -25,7 +25,7 @@ interface CopilotRequestBody {
 }
 
 const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
-const NVIDIA_MODEL = 'minimaxai/minimax-m1';
+const NVIDIA_MODEL = 'minimaxai/minimax-m2.7';
 
 const SYSTEM_PROMPT = `You are an AI investment analyst.
 
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         ],
         temperature: 0.6,
         top_p: 0.95,
-        max_tokens: 1500,
+        max_tokens: 4096,
       }),
     });
 
