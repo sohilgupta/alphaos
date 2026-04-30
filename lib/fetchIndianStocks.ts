@@ -1,15 +1,13 @@
 import type { PortfolioStock, SheetStock } from '@/lib/types';
+import { getCache, setCache } from '@/lib/cache';
 
 const INDIAN_SHEET_ID = '1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM';
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000; // 5 min
 
 const INDIAN_WATCHLIST_SHEETS = [
   { sheet: 'Stock Watchlist 2', categoryFallback: 'Defence Stocks' },
   { sheet: 'Stock Watchlist 3', categoryFallback: 'Infrastructure Stocks' },
 ];
-
-let portfolioCache: { stocks: PortfolioStock[]; fetchedAt: number } | null = null;
-let watchlistCache: { stocks: SheetStock[]; fetchedAt: number } | null = null;
 
 type GoogleCell = { v?: string | number | null; f?: string };
 type GoogleTable = {
@@ -18,8 +16,7 @@ type GoogleTable = {
 };
 
 function gvizUrl(sheet: string) {
-  const encodedSheet = encodeURIComponent(sheet);
-  return `https://docs.google.com/spreadsheets/d/${INDIAN_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodedSheet}`;
+  return `https://docs.google.com/spreadsheets/d/${INDIAN_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}`;
 }
 
 async function fetchGvizTable(sheet: string): Promise<GoogleTable> {
@@ -41,7 +38,7 @@ function normalizeHeader(value: string) {
 
 function headerIndex(headers: string[], ...matches: string[]) {
   const lowered = matches.map(normalizeHeader);
-  return headers.findIndex((header) => lowered.some((match) => header.includes(match)));
+  return headers.findIndex(h => lowered.some(m => h.includes(m)));
 }
 
 function cellValue(row: Array<GoogleCell | null>, index: number) {
@@ -53,7 +50,6 @@ function cellValue(row: Array<GoogleCell | null>, index: number) {
 function parseNumber(value: unknown): number | null {
   if (value == null || value === '') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-
   const cleaned = value.toString().replace(/[%,$,₹]/g, '').trim();
   const parsed = Number.parseFloat(cleaned);
   return Number.isFinite(parsed) ? parsed : null;
@@ -67,37 +63,30 @@ function parsePercent(value: unknown): number | null {
 
 function normalizeIndianTicker(raw: unknown): string | null {
   if (raw == null) return null;
-
   const value = raw.toString().trim().toUpperCase();
   if (!value) return null;
-
   if (value.startsWith('NSE:')) return `${value.slice(4)}.NS`;
   if (value.startsWith('BOM:') || value.startsWith('BSE:')) return `${value.slice(4)}.BO`;
   if (/^\d+$/.test(value)) return `${value}.BO`;
   if (value.endsWith('.NS') || value.endsWith('.BO')) return value;
-
   return `${value}.NS`;
 }
 
 function categoryFromFirstHeader(header: string, fallback: string) {
-  const cleaned = header.replace(/^stock\s+/i, '').trim();
-  return cleaned || fallback;
-}
-
-function rowValues(row: { c: Array<GoogleCell | null> }) {
-  return row.c;
+  return header.replace(/^stock\s+/i, '').trim() || fallback;
 }
 
 export async function getIndianPortfolio(forceRefresh = false): Promise<PortfolioStock[]> {
-  if (!forceRefresh && portfolioCache && Date.now() - portfolioCache.fetchedAt < CACHE_TTL) {
-    return portfolioCache.stocks;
+  if (!forceRefresh) {
+    const cached = getCache<PortfolioStock[]>('india-portfolio');
+    if (cached) return cached;
   }
 
   const stocks: PortfolioStock[] = [];
 
   try {
     const table = await fetchGvizTable('Trendlyne portfolio');
-    const headers = table.cols.map((col) => normalizeHeader(col.label));
+    const headers = table.cols.map(col => normalizeHeader(col.label));
     const idxTicker = headerIndex(headers, 'nsecode', 'bsecode', 'stock code');
     const idxName = headerIndex(headers, 'stock name');
     const idxQuantity = headerIndex(headers, 'quantity');
@@ -105,7 +94,7 @@ export async function getIndianPortfolio(forceRefresh = false): Promise<Portfoli
     const idxInvested = headerIndex(headers, 'invested amount', 'starting value', 'invested value');
 
     for (const row of table.rows) {
-      const values = rowValues(row);
+      const values = row.c;
       const ticker = normalizeIndianTicker(cellValue(values, idxTicker));
       if (!ticker) continue;
 
@@ -128,13 +117,14 @@ export async function getIndianPortfolio(forceRefresh = false): Promise<Portfoli
     console.error('Failed to fetch Indian portfolio:', error);
   }
 
-  portfolioCache = { stocks, fetchedAt: Date.now() };
+  setCache('india-portfolio', stocks, CACHE_TTL);
   return stocks;
 }
 
 export async function getIndianWatchlist(forceRefresh = false): Promise<SheetStock[]> {
-  if (!forceRefresh && watchlistCache && Date.now() - watchlistCache.fetchedAt < CACHE_TTL) {
-    return watchlistCache.stocks;
+  if (!forceRefresh) {
+    const cached = getCache<SheetStock[]>('india-watchlist');
+    if (cached) return cached;
   }
 
   const allStocks: SheetStock[] = [];
@@ -142,9 +132,8 @@ export async function getIndianWatchlist(forceRefresh = false): Promise<SheetSto
   await Promise.allSettled(
     INDIAN_WATCHLIST_SHEETS.map(async ({ sheet, categoryFallback }) => {
       const table = await fetchGvizTable(sheet);
-      const headers = table.cols.map((col) => normalizeHeader(col.label));
-      const rawHeaders = table.cols.map((col) => col.label);
-      const idxName = 0;
+      const headers = table.cols.map(col => normalizeHeader(col.label));
+      const rawHeaders = table.cols.map(col => col.label);
       const idxTicker = headerIndex(headers, 'stock code');
       const idxCurrentPrice = headerIndex(headers, 'current price');
       const idxFairPrice = headerIndex(headers, 'fair price', 'intrinsic price');
@@ -157,13 +146,13 @@ export async function getIndianWatchlist(forceRefresh = false): Promise<SheetSto
       const category = categoryFromFirstHeader(rawHeaders[0] || '', categoryFallback);
 
       for (const row of table.rows) {
-        const values = rowValues(row);
+        const values = row.c;
         const ticker = normalizeIndianTicker(cellValue(values, idxTicker));
         if (!ticker) continue;
 
         allStocks.push({
           ticker,
-          name: cellValue(values, idxName)?.toString().trim() || ticker,
+          name: cellValue(values, 0)?.toString().trim() || ticker,
           category,
           sheetTab: sheet,
           description: '',
@@ -183,12 +172,12 @@ export async function getIndianWatchlist(forceRefresh = false): Promise<SheetSto
   );
 
   const seen = new Set<string>();
-  const deduped = allStocks.filter((stock) => {
+  const deduped = allStocks.filter(stock => {
     if (seen.has(stock.ticker)) return false;
     seen.add(stock.ticker);
     return true;
   });
 
-  watchlistCache = { stocks: deduped, fetchedAt: Date.now() };
+  setCache('india-watchlist', deduped, CACHE_TTL);
   return deduped;
 }
