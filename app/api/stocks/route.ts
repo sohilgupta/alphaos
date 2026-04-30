@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
     ]);
 
     const liveQuotes = await getBatchQuotes(Array.from(tickers));
-    const usStocks = await mergeUSData(usWatchlist, usPortfolio, liveQuotes, user);
-    const indianStocks = await mergeIndianData(indianWatchlist, indianPortfolio, liveQuotes, user);
+    const usStocks = mergeUSData(usWatchlist, usPortfolio, liveQuotes, user);
+    const indianStocks = mergeIndianData(indianWatchlist, indianPortfolio, liveQuotes, user);
     const merged: MergedStock[] = [...usStocks, ...indianStocks];
 
     const withLive = merged.filter(s => s.live?.price);
