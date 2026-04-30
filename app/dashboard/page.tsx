@@ -36,7 +36,8 @@ export default function DashboardPage() {
   const [viewFilter, setViewFilter] = useState<'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP'>(() => {
     if (typeof window === 'undefined') return 'ALL';
     const params = new URLSearchParams(window.location.search);
-    return params.get('filter')?.toUpperCase() === 'PORTFOLIO' ? 'PORTFOLIO' : 'ALL';
+    const filter = params.get('filter')?.toUpperCase();
+    return ['ALL', 'WATCHLIST', 'PORTFOLIO', 'OVERLAP'].includes(filter ?? '') ? (filter as 'ALL' | 'WATCHLIST' | 'PORTFOLIO' | 'OVERLAP') : 'ALL';
   });
 
   const stocks = useMemo<MergedStock[]>(() => data?.stocks ?? [], [data?.stocks]);
@@ -86,9 +87,30 @@ export default function DashboardPage() {
   }, [filteredByView]);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-full overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <div className="mx-auto max-w-screen-xl space-y-4 overflow-hidden px-4 py-4 md:space-y-6 md:px-8 md:py-6">
+      <div className="md:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-800 tracking-tight text-foreground">
+              {viewFilter === 'PORTFOLIO' ? 'Portfolio' : 'Watchlist'}
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {isLoading ? 'Loading…' : `${filtered.length} ${region === 'US' ? 'US' : 'Indian'} stocks`}
+            </p>
+          </div>
+          <button
+            onClick={() => setRefreshToken(Date.now())}
+            disabled={isFetching}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-secondary/50 text-muted-foreground"
+            aria-label="Refresh stocks"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Desktop Header */}
+      <div className="hidden flex-col gap-4 md:flex xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-2xl font-800 text-foreground tracking-tight">AlphaOS Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -144,11 +166,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="hidden grid-cols-2 gap-4 md:grid lg:grid-cols-4">
         {[
           {
             label: 'Total Stocks',
-            value: isLoading ? null : stocks.length,
+            value: isLoading ? null : filteredByRegion.length,
             icon: BarChart2,
             format: (v: number) => v.toString(),
           },
@@ -211,7 +233,7 @@ export default function DashboardPage() {
 
       {/* Gainers / Losers strip */}
       {!isLoading && topGainers.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="hidden grid-cols-1 gap-4 md:grid md:grid-cols-2">
           {[
             { title: 'Top Gainers (Today)', items: topGainers, positive: true },
             { title: 'Top Losers (Today)', items: topLosers, positive: false },
@@ -244,7 +266,7 @@ export default function DashboardPage() {
       )}
 
       {/* View toggle */}
-      <div className="flex items-center gap-3">
+      <div className="hidden items-center gap-3 md:flex">
         <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-white/8">
           <button
             onClick={() => setView('table')}
@@ -264,6 +286,39 @@ export default function DashboardPage() {
       {/* Category Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="overflow-x-auto scrollbar-thin pb-1">
+          <div className="mb-3 flex gap-2 overflow-x-auto md:hidden">
+            {[
+              { id: 'US', label: '🇺🇸 US' },
+              { id: 'INDIA', label: '🇮🇳 India' },
+            ].map(option => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  setRegion(option.id as 'US' | 'INDIA');
+                  setActiveTab('All');
+                  setViewFilter('ALL');
+                }}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-700 transition-colors ${region === option.id ? 'border-primary/30 bg-primary/20 text-primary' : 'border-white/8 bg-secondary/40 text-muted-foreground'}`}
+              >
+                {option.label}
+              </button>
+            ))}
+            {[
+              { id: 'WATCHLIST', label: 'Watchlist' },
+              ...(isOwner ? [{ id: 'PORTFOLIO', label: 'Portfolio' }] : []),
+            ].map(option => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  setViewFilter(option.id as 'WATCHLIST' | 'PORTFOLIO');
+                  setActiveTab('All');
+                }}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-700 transition-colors ${viewFilter === option.id ? 'border-primary/30 bg-primary/20 text-primary' : 'border-white/8 bg-secondary/40 text-muted-foreground'}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <TabsList className="bg-secondary/50 border border-white/8 h-auto p-1 gap-0.5 w-max">
             {tabs.map(tab => (
               <TabsTrigger
@@ -274,7 +329,7 @@ export default function DashboardPage() {
                 {tab}
                 {tab !== 'All' && (
                   <span className="ml-1.5 text-muted-foreground/60">
-                    {stocks.filter((s: MergedStock) => s.category === tab || s.sheetTab === tab).length}
+                    {filteredByView.filter((s: MergedStock) => s.category === tab || s.sheetTab === tab).length}
                   </span>
                 )}
               </TabsTrigger>

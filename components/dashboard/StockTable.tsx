@@ -51,6 +51,74 @@ function ReturnStrip({ stock }: { stock: MergedStock }) {
   );
 }
 
+function signalsForStock(stock: MergedStock, isOwner: boolean) {
+  const signals: string[] = [];
+  const change = stock.live?.changePercent ?? null;
+  if (change != null && change > 2) signals.push('Momentum');
+  if (stock.gain1M != null && stock.gain1M > 10) signals.push('Strong 1M');
+  if (stock.gain1Y != null && stock.gain1Y > 40) signals.push('Breakout');
+  if (stock.convictionScore > 7) signals.push('High Conviction');
+  if (isOwner && stock.isInPortfolio) signals.push('Portfolio');
+  if (!signals.length && stock.originalTheme) signals.push(stock.originalTheme);
+  return signals.slice(0, 3);
+}
+
+function MobileStockCard({
+  stock,
+  isOwner,
+  onOpen,
+}: {
+  stock: MergedStock;
+  isOwner: boolean;
+  onOpen: () => void;
+}) {
+  const price = stock.live?.price ?? stock.currentPriceSheet ?? null;
+  const change = stock.live?.changePercent ?? null;
+  const signals = signalsForStock(stock, isOwner);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      onContextMenu={(event) => event.preventDefault()}
+      className="w-full rounded-2xl border border-white/8 bg-zinc-950/70 p-4 text-left shadow-sm transition-colors active:bg-white/[0.06]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-700 text-foreground">{stock.live?.shortName || stock.name}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs font-600 text-muted-foreground">{stock.ticker}</p>
+            <Badge variant="secondary" className="rounded-md px-1.5 py-0 text-[10px]">
+              {stock.region === 'INDIA' ? 'India' : 'US'}
+            </Badge>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-800 tabular-nums text-foreground">{formatStockPrice(price, stock.region)}</p>
+          <p className={`mt-1 text-sm font-700 tabular-nums ${getChangeColor(change)}`}>
+            {formatPercent(change)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <ReturnStrip stock={stock} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {signals.map((signal) => (
+          <span
+            key={signal}
+            className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-600 text-muted-foreground"
+          >
+            {signal}
+          </span>
+        ))}
+      </div>
+    </button>
+  );
+}
+
 export default function StockTable({ stocks, isLoading }: Props) {
   const router = useRouter();
   const { role } = useAuth();
@@ -118,10 +186,10 @@ export default function StockTable({ stocks, isLoading }: Props) {
       <div className="space-y-2">
         <div className="flex items-center gap-3 mb-4">
           <Skeleton className="h-9 flex-1 skeleton" />
-          <Skeleton className="h-9 w-20 skeleton" />
+          <Skeleton className="hidden h-9 w-20 skeleton md:block" />
         </div>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full skeleton" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-2xl md:h-12 skeleton" />
         ))}
       </div>
     );
@@ -141,7 +209,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
             className="pl-9 bg-secondary/50 border-white/8 text-sm focus-visible:ring-primary/40"
           />
         </div>
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-white/8">
+        <div className="hidden items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-white/8 md:flex">
           <button
             onClick={() => setView('table')}
             className={`p-1.5 rounded-md transition-colors ${view === 'table' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -195,51 +263,14 @@ export default function StockTable({ stocks, isLoading }: Props) {
       ) : (
         <>
           <div className="md:hidden space-y-3">
-            {sorted.map(stock => {
-              const price = stock.live?.price;
-              return (
-                <div
-                  key={stock.ticker}
-                  onClick={() => router.push(`/stock/${stock.ticker}`)}
-                  className="glass-card p-4 cursor-pointer hover:border-primary/30 transition-all"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-800 text-foreground">{stock.ticker}</span>
-                        <Badge variant="secondary" className="text-[10px]">{stock.region === 'INDIA' ? 'India' : 'US'}</Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">{stock.live?.shortName || stock.name}</div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="font-700 tabular-nums">{price ? formatStockPrice(price, stock.region) : formatStockPrice(stock.currentPriceSheet, stock.region)}</div>
-                      <Badge className={`mt-1 text-xs font-600 ${getChangeBg(stock.live?.changePercent ?? null)}`} variant="secondary">
-                        {formatPercent(stock.live?.changePercent ?? null)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <ReturnStrip stock={stock} />
-                  </div>
-                  {isOwner && stock.portfolioData && (
-                    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-xs">
-                      <div>
-                        <div className="text-muted-foreground">Qty</div>
-                        <div className="font-700 tabular-nums">{stock.portfolioData.quantity}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">Avg</div>
-                        <div className="font-700 tabular-nums">{formatStockPrice(stock.portfolioData.avgBuyPrice, stock.region)}</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground">P&L</div>
-                        <div className={`font-700 tabular-nums ${getChangeColor(stock.pnl ?? null)}`}>{formatStockPrice(stock.pnl ?? null, stock.region)}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {sorted.map(stock => (
+              <MobileStockCard
+                key={stock.ticker}
+                stock={stock}
+                isOwner={isOwner}
+                onOpen={() => router.push(`/stock/${stock.ticker}`)}
+              />
+            ))}
           </div>
 
           <div className="hidden md:block rounded-xl border border-white/8 overflow-hidden">
