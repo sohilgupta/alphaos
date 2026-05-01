@@ -33,18 +33,36 @@ export async function GET(request: NextRequest) {
 
     const liveQuotes = await getBatchQuotes(Array.from(tickers));
 
-    // Fetch historical returns for portfolio-only stocks (not in any watchlist)
-    const watchlistTickers = new Set([
-      ...usWatchlist.map(s => s.ticker),
-      ...indianWatchlist.map(s => s.ticker),
+    // Build a watchlist data map for quick field-presence checks
+    const watchlistDataMap = new Map([
+      ...usWatchlist.map(s => [s.ticker, s] as const),
+      ...indianWatchlist.map(s => [s.ticker, s] as const),
     ]);
-    const portfolioOnlyTickers = [
+
+    // Fetch historical returns for every ticker that has a live price but is missing
+    // gain6M (shown as 3M) or gain1Y — covers portfolio-only stocks AND watchlist stocks
+    // where the sheet doesn't have those columns filled.
+    // Portfolio stocks are sorted first so they're prioritised if we hit the cap.
+    const portfolioTickers = new Set([
       ...(isOwner ? usPortfolio.map(s => s.ticker) : []),
       ...(isOwner ? indianPortfolio.map(s => s.ticker) : []),
-    ].filter(t => !watchlistTickers.has(t));
+    ]);
 
-    const historicalMap = portfolioOnlyTickers.length > 0
-      ? await getBatchHistoricalReturns(portfolioOnlyTickers, liveQuotes)
+    const tickersNeedingHistory = Array.from(tickers)
+      .filter(ticker => {
+        if (!(liveQuotes.get(ticker)?.price)) return false;
+        const w = watchlistDataMap.get(ticker);
+        return !w || w.gain6M == null || w.gain1Y == null;
+      })
+      .sort((a, b) => {
+        const aPort = portfolioTickers.has(a) ? 0 : 1;
+        const bPort = portfolioTickers.has(b) ? 0 : 1;
+        return aPort - bPort;
+      })
+      .slice(0, 80); // cap to avoid request timeout
+
+    const historicalMap = tickersNeedingHistory.length > 0
+      ? await getBatchHistoricalReturns(tickersNeedingHistory, liveQuotes)
       : new Map();
 
     const usStocks = mergeUSData(usWatchlist, usPortfolio, liveQuotes, user, historicalMap);

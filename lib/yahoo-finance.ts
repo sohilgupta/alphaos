@@ -254,8 +254,8 @@ export async function getBatchHistoricalReturns(
     }
   }
 
-  const CONCURRENCY = 3;
-  const DELAY_MS = 400;
+  const CONCURRENCY = 6;
+  const DELAY_MS = 200;
   const now = new Date();
   const weekAgo        = new Date(now.getTime() -   7 * 24 * 60 * 60 * 1000);
   const monthAgo       = new Date(now.getTime() -  30 * 24 * 60 * 60 * 1000);
