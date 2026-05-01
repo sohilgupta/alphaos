@@ -1,5 +1,6 @@
 import { suggestTheme } from '@/lib/intelligence';
 import type { LiveQuote, MergedStock, PortfolioStock, Region, SheetStock, User } from '@/lib/types';
+import type { BatchHistoricalReturns } from '@/lib/yahoo-finance';
 
 const PUBLIC_PORTFOLIO_KEYS = [
   'portfolioData',
@@ -26,7 +27,8 @@ function mergeData(
   portfolio: PortfolioStock[],
   liveQuotes: Map<string, LiveQuote>,
   user: User | null,
-  region: Region
+  region: Region,
+  historicalMap: Map<string, BatchHistoricalReturns> = new Map()
 ): MergedStock[] {
   const owner = isOwner(user);
   const watchlistMap = new Map(watchlist.map((stock) => [stock.ticker, stock]));
@@ -57,9 +59,10 @@ function mergeData(
         ? (live.price - avgBuyPrice) * quantity
         : undefined;
 
-      const gain1W = wData?.gain1W ?? null;
-      const gain1M = wData?.gain1M ?? null;
-      const gain1Y = wData?.gain1Y ?? null;
+      const hist = historicalMap.get(ticker);
+      const gain1W = wData?.gain1W ?? hist?.gain1W ?? null;
+      const gain1M = wData?.gain1M ?? hist?.gain1M ?? null;
+      const gain1Y = wData?.gain1Y ?? hist?.gain1Y ?? null;
       const gain3Y = wData?.gain3Y ?? null;
 
       const stock: MergedStock = {
@@ -75,7 +78,7 @@ function mergeData(
         potentialGain: wData?.potentialGain ?? null,
         gain1W,
         gain1M,
-        gain6M: wData?.gain6M ?? null,
+        gain6M: wData?.gain6M ?? hist?.gain6M ?? null,
         gain1Y,
         gain3Y,
         live,
@@ -108,16 +111,18 @@ export function mergeUSData(
   watchlist: SheetStock[],
   portfolio: PortfolioStock[],
   liveQuotes: Map<string, LiveQuote>,
-  user: User | null
+  user: User | null,
+  historicalMap: Map<string, BatchHistoricalReturns> = new Map()
 ): MergedStock[] {
-  return mergeData(watchlist, portfolio, liveQuotes, user, 'US');
+  return mergeData(watchlist, portfolio, liveQuotes, user, 'US', historicalMap);
 }
 
 export function mergeIndianData(
   watchlist: SheetStock[],
   portfolio: PortfolioStock[],
   liveQuotes: Map<string, LiveQuote>,
-  user: User | null
+  user: User | null,
+  historicalMap: Map<string, BatchHistoricalReturns> = new Map()
 ): MergedStock[] {
-  return mergeData(watchlist, portfolio, liveQuotes, user, 'INDIA');
+  return mergeData(watchlist, portfolio, liveQuotes, user, 'INDIA', historicalMap);
 }
