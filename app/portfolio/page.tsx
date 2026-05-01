@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, PieChart, BarChart2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatPercent, formatStockPrice, getChangeBg, getChangeColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
+import CASUpload from '@/components/dashboard/CASUpload';
+import MutualFundsTable from '@/components/dashboard/MutualFundsTable';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 interface PortfolioHolding {
   ticker: string;
@@ -29,7 +32,11 @@ async function fetchPortfolio(region: 'us' | 'india') {
 }
 
 export default function PortfolioPage() {
+  const { role } = useAuth();
+  const isOwner = role === 'owner';
+  const queryClient = useQueryClient();
   const [activeRegion, setActiveRegion] = useState<'us' | 'india'>('us');
+  const [activeTab, setActiveTab] = useState<'holdings' | 'mutual-funds'>('holdings');
 
   const { data: usData, isLoading: usLoading } = useQuery({
     queryKey: ['portfolio', 'us'],
@@ -45,6 +52,9 @@ export default function PortfolioPage() {
 
   const currentData = activeRegion === 'us' ? usData : indiaData;
   const isLoading = activeRegion === 'us' ? usLoading : indiaLoading;
+  const isIndia = activeRegion === 'india';
+  const currencySymbol = isIndia ? '₹' : '$';
+  const locale = isIndia ? 'en-IN' : 'en-US';
 
   const holdings = useMemo<PortfolioHolding[]>(() => {
     if (!currentData?.holdings) return [];
@@ -117,14 +127,24 @@ export default function PortfolioPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold">Portfolio</h1>
-        <Tabs value={activeRegion} onValueChange={(value) => setActiveRegion(value as 'us' | 'india')}>
-          <TabsList>
-            <TabsTrigger value="us">US Portfolio</TabsTrigger>
-            <TabsTrigger value="india">Indian Portfolio</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          {isOwner && activeRegion === 'india' && (
+            <CASUpload
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['portfolio', 'india'] });
+                queryClient.invalidateQueries({ queryKey: ['mutual-funds'] });
+              }}
+            />
+          )}
+          <Tabs value={activeRegion} onValueChange={(value) => { setActiveRegion(value as 'us' | 'india'); setActiveTab('holdings'); }}>
+            <TabsList>
+              <TabsTrigger value="us">🇺🇸 US</TabsTrigger>
+              <TabsTrigger value="india">🇮🇳 India</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {portfolioStats && (
@@ -134,7 +154,7 @@ export default function PortfolioPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Invested</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${portfolioStats.totalInvested.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{portfolioStats.totalInvested.toLocaleString(locale)}</div>
             </CardContent>
           </Card>
 
@@ -143,7 +163,7 @@ export default function PortfolioPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Current Value</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${portfolioStats.totalCurrent.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{currencySymbol}{portfolioStats.totalCurrent.toLocaleString(locale)}</div>
             </CardContent>
           </Card>
 
@@ -153,7 +173,7 @@ export default function PortfolioPage() {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${portfolioStats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ${portfolioStats.totalPnL.toLocaleString()}
+                {currencySymbol}{portfolioStats.totalPnL.toLocaleString(locale)}
               </div>
               <div className={`text-sm ${portfolioStats.totalPnLPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatPercent(portfolioStats.totalPnLPercent)}
@@ -172,6 +192,31 @@ export default function PortfolioPage() {
         </div>
       )}
 
+      {/* Tabs for Holdings / Mutual Funds (India only) */}
+      {activeRegion === 'india' && isOwner && (
+        <div className="flex gap-1 bg-secondary/40 p-1 rounded-lg border border-white/8 w-fit">
+          {(['holdings', 'mutual-funds'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded-md text-xs font-600 transition-colors ${activeTab === tab ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {tab === 'holdings' ? 'Equity Holdings' : 'Mutual Funds'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeRegion === 'india' && isOwner && activeTab === 'mutual-funds' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Mutual Fund Holdings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MutualFundsTable />
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>Holdings</CardTitle>
@@ -186,14 +231,14 @@ export default function PortfolioPage() {
                     <Badge variant="outline">{holding.name}</Badge>
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {holding.quantity} shares @ ${holding.avgBuyPrice.toFixed(2)}
+                    {holding.quantity} shares @ {currencySymbol}{holding.avgBuyPrice.toLocaleString(locale, { maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="font-semibold">${(holding.currentValue || 0).toLocaleString()}</div>
+                  <div className="font-semibold">{currencySymbol}{(holding.currentValue || 0).toLocaleString(locale)}</div>
                   <div className={`text-sm ${getChangeColor(holding.pnl)}`}>
-                    ${holding.pnl?.toLocaleString()} ({formatPercent(holding.pnlPercent)})
+                    {currencySymbol}{holding.pnl?.toLocaleString(locale)} ({formatPercent(holding.pnlPercent)})
                   </div>
                 </div>
               </div>
@@ -201,6 +246,7 @@ export default function PortfolioPage() {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
