@@ -231,6 +231,71 @@ export async function getHistoricalReturns(ticker: string, currentPrice: number)
   };
 }
 
+export interface BatchHistoricalReturns {
+  gain1W: number | null;
+  gain1M: number | null;
+  gain6M: number | null; // 3M lookback — stored as gain6M to match MergedStock field used for 3M display
+  gain1Y: number | null;
+}
+
+export async function getBatchHistoricalReturns(
+  tickers: string[],
+  liveQuotes: Map<string, LiveQuote>
+): Promise<Map<string, BatchHistoricalReturns>> {
+  const result = new Map<string, BatchHistoricalReturns>();
+  const toFetch: string[] = [];
+
+  for (const ticker of tickers) {
+    const cached = getCache<BatchHistoricalReturns>(`returns:${ticker}`);
+    if (cached) {
+      result.set(ticker, cached);
+    } else {
+      toFetch.push(ticker);
+    }
+  }
+
+  const CONCURRENCY = 3;
+  const DELAY_MS = 400;
+  const now = new Date();
+  const weekAgo        = new Date(now.getTime() -   7 * 24 * 60 * 60 * 1000);
+  const monthAgo       = new Date(now.getTime() -  30 * 24 * 60 * 60 * 1000);
+  const threeMonthAgo  = new Date(now.getTime() -  90 * 24 * 60 * 60 * 1000);
+
+  for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
+    const batch = toFetch.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (ticker) => {
+      const price = liveQuotes.get(ticker)?.price;
+      if (!price) return;
+
+      try {
+        const history = await getHistory(ticker, '1y');
+        if (!history.length) return;
+
+        const calc = (point: ChartDataPoint | null) =>
+          point ? ((price - point.close) / point.close) * 100 : null;
+
+        const returns: BatchHistoricalReturns = {
+          gain1W: calc(closestPointToDate(history, weekAgo)),
+          gain1M: calc(closestPointToDate(history, monthAgo)),
+          gain6M: calc(closestPointToDate(history, threeMonthAgo)),
+          gain1Y: calc(history[0] ?? null),
+        };
+
+        setCache(`returns:${ticker}`, returns, HISTORY_TTL);
+        result.set(ticker, returns);
+      } catch (err) {
+        console.error(`getBatchHistoricalReturns failed for ${ticker}:`, err);
+      }
+    }));
+
+    if (i + CONCURRENCY < toFetch.length) {
+      await new Promise(r => setTimeout(r, DELAY_MS));
+    }
+  }
+
+  return result;
+}
+
 function getPeriodStartDate(period: HistoryPeriod): Date {
   const now = new Date();
   switch (period) {

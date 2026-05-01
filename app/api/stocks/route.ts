@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchAllSheetStocks, fetchPortfolioStocks } from '@/lib/google-sheets';
 import { getIndianPortfolio, getIndianWatchlist } from '@/lib/fetchIndianStocks';
-import { getBatchQuotes } from '@/lib/yahoo-finance';
+import { getBatchQuotes, getBatchHistoricalReturns } from '@/lib/yahoo-finance';
 import { MergedStock } from '@/lib/types';
 import { getUser } from '@/lib/auth';
 import { mergeIndianData, mergeUSData } from '@/lib/merge-stocks';
@@ -32,8 +32,23 @@ export async function GET(request: NextRequest) {
     ]);
 
     const liveQuotes = await getBatchQuotes(Array.from(tickers));
-    const usStocks = mergeUSData(usWatchlist, usPortfolio, liveQuotes, user);
-    const indianStocks = mergeIndianData(indianWatchlist, indianPortfolio, liveQuotes, user);
+
+    // Fetch historical returns for portfolio-only stocks (not in any watchlist)
+    const watchlistTickers = new Set([
+      ...usWatchlist.map(s => s.ticker),
+      ...indianWatchlist.map(s => s.ticker),
+    ]);
+    const portfolioOnlyTickers = [
+      ...(isOwner ? usPortfolio.map(s => s.ticker) : []),
+      ...(isOwner ? indianPortfolio.map(s => s.ticker) : []),
+    ].filter(t => !watchlistTickers.has(t));
+
+    const historicalMap = portfolioOnlyTickers.length > 0
+      ? await getBatchHistoricalReturns(portfolioOnlyTickers, liveQuotes)
+      : new Map();
+
+    const usStocks = mergeUSData(usWatchlist, usPortfolio, liveQuotes, user, historicalMap);
+    const indianStocks = mergeIndianData(indianWatchlist, indianPortfolio, liveQuotes, user, historicalMap);
     const merged: MergedStock[] = [...usStocks, ...indianStocks];
 
     const withLive = merged.filter(s => s.live?.price);
