@@ -138,7 +138,41 @@ function parseAll(lines: string[]): {
   return { equities, mutualFunds: Array.from(mfByKey.values()) };
 }
 
+// pdfjs-dist legacy build references browser globals at module load time
+// (DOMMatrix, Path2D, ImageData). Node.js doesn't define these. Stub them
+// before the dynamic import so the module evaluates cleanly. Only canvas
+// rendering uses these — text extraction works without real implementations.
+function ensurePdfjsGlobals(): void {
+  const g = globalThis as Record<string, unknown>;
+  class StubMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    constructor(_init?: unknown) {}
+    multiply() { return new StubMatrix(); }
+    translate() { return new StubMatrix(); }
+    scale() { return new StubMatrix(); }
+    rotate() { return new StubMatrix(); }
+    invertSelf() { return this; }
+  }
+  if (typeof g.DOMMatrix === 'undefined') g.DOMMatrix = StubMatrix;
+  if (typeof g.Path2D === 'undefined') g.Path2D = class { addPath() {} closePath() {} moveTo() {} lineTo() {} bezierCurveTo() {} quadraticCurveTo() {} arc() {} rect() {} };
+  if (typeof g.ImageData === 'undefined') {
+    g.ImageData = class {
+      data: Uint8ClampedArray; width: number; height: number;
+      constructor(w: number | Uint8ClampedArray, h: number, _opts?: unknown) {
+        if (w instanceof Uint8ClampedArray) { this.data = w; this.width = h; this.height = (w.length / (h * 4)) | 0; }
+        else { this.width = w; this.height = h; this.data = new Uint8ClampedArray(w * h * 4); }
+      }
+    };
+  }
+}
+
 async function extractPdfText(fileBuffer: Buffer, password: string): Promise<string> {
+  ensurePdfjsGlobals();
+
   // Use pdfjs-dist/legacy directly — avoids worker-path issues that pdf-parse
   // encounters when bundled in Next.js serverless functions.
   const _require = createRequire(import.meta.url);
