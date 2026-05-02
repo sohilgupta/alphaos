@@ -7,226 +7,135 @@ function stripPII(text: string): string {
   return text.replace(PAN_RE, '[PAN_REDACTED]');
 }
 
-function parseNum(s: string): number | null {
-  const n = parseFloat(s.replace(/,/g, '').trim());
-  return isFinite(n) && n >= 0 ? n : null;
+function parseNum(s: string): number {
+  return parseFloat(s.replace(/,/g, ''));
 }
 
-function extractNumbers(s: string): number[] {
-  return (s.match(/[\d,]+\.?\d*/g) ?? [])
-    .map(n => parseNum(n))
-    .filter((n): n is number => n !== null);
-}
+// ─── Regex patterns ────────────────────────────────────────────────────────────
+// ISIN at the start of a line, possibly glued to the next token (NSDL) or
+// followed by space (CDSL).
+const ISIN_AT_START_RE = /^(IN[EF][A-Z0-9]{8}[0-9])/;
 
-// Standalone ISIN line: the entire trimmed line is exactly an ISIN (12 chars)
-const STANDALONE_ISIN_RE = /^(IN[EF][A-Z0-9]{8}[0-9])$/;
+// NSDL equity row: ISIN<glued>NAME <facevalue> <qty> <price> <value>
+//   e.g. "INE918I01026BAJAJ FINSERV LIMITED 1.00 650 1,631.80 10,60,670.00"
+//   facevalue: \d+\.\d{2}, qty: integer or decimal, price: \d+\.\d{2}, value: \d+\.\d{2}
+const NSDL_EQUITY_RE = /^(IN[EF][A-Z0-9]{8}[0-9])(.+?)\s+(\d+\.\d{2})\s+([\d,]+(?:\.\d+)?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
 
-// CDSL equity: ISIN followed by company name on the same line
-// e.g. "INE216P01012 AAVAS FINANCIERS LIMITED"
-const CDSL_INLINE_RE = /^(INE[A-Z0-9]{8}[0-9])\s+(.+)$/;
+// NSDL ticker line — usually `<TICKER>.NSE` or `<TICKER>.BSE`, sometimes with
+// trailing name continuation: e.g. "BAJAJHFL.NSE LIMITED"
+const NSDL_TICKER_RE = /^([A-Z0-9\-&]+)\.(NSE|BSE)(?:\s+(.+))?$/;
 
-// CDSL balance header: "# EQUITY SHARES <qty>"
-const EQUITY_SHARES_RE = /^#\s+EQUITY\s+SHARES\s+([\d,.]+\.?\d*)/i;
+// CDSL equity row: ISIN <NAME glued to qty> <safekeep_bal>(\d+\.\d{3}) <pledged_bal>(\d+\.\d{3}) <price>(\d+\.\d{2}) <value>(\d+\.\d{2})
+//   e.g. "INE216P01012 AAVAS FINANCIERS LIMITED20.0000.0000.0001,078.90 21,578.00"
+//   The qty is glued to the name end. Pattern: name<qty.000><0.000><0.000><price.NN> <value.NN>
+const CDSL_EQUITY_RE = /^(IN[EF][A-Z0-9]{8}[0-9])\s+(.+?)([\d,]+\.\d{3})([\d,]+\.\d{3})([\d,]+\.\d{3})([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
 
-// Single decimal number (CDSL balance breakdown lines, e.g. "20.000", "0.000")
-const DECIMAL_ONLY_RE = /^[\d,]+\.\d+\s*$/;
+// MF row: ISIN<glued>SCHEME<glued>FOLIO <units 3-dec> <avgcost 4-dec> <totalcost 2-dec> <NAV 4-dec> <value 2-dec> <pnl 2-dec> <return 2-dec>
+//   e.g. "INF846K015J4AXIS SILVER9016013774 2,524.819 39.6261 1,00,048.73 40.2214 1,01,551.75 1,503.02 7.60"
+//   Folio is 10+ digits. Units/avgcost may be space-separated OR glued.
+const MF_RE = /^(INF[A-Z0-9]{8}[0-9])(.+?)(\d{10,})\s+([\d,]+\.\d{3})\s*([\d,]+\.\d{4})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{4})\s+([\d,]+\.\d{2})\s+(-?[\d,]+\.\d{2})\s+(-?[\d,]+\.\d{2})\s*$/;
 
-// Exactly two numbers on a line (CDSL price + value line)
-// e.g. "1,078.90 21,578.00"
-const TWO_NUMS_RE = /^([\d,]+\.?\d+)\s+([\d,]+\.?\d+)\s*$/;
-
-// NSDL data line: SYMBOL.NSE NAME facevalue qty price value
-// e.g. "BAJAJFINSV.NSE BAJAJ FINSERV LIMITED 1.00 650 1,631.80 10,60,670.00"
-function parseNSDLDataLine(line: string): {
-  ticker: string;
-  name: string;
-  quantity: number;
-  marketPrice: number | null;
-  value: number;
-} | null {
-  const symbolMatch = /^([A-Z0-9\-&]+\.(?:NSE|BSE))\s+/.exec(line);
-  if (!symbolMatch) return null;
-
-  const ticker = symbolMatch[1].replace('.NSE', '.NS').replace('.BSE', '.BO');
-  const rest = line.slice(symbolMatch[0].length).trim();
-
-  // Trailing 3-4 space-separated numeric groups = facevalue qty price value
-  const trailingMatch = rest.match(/(?:\s+[\d,]+\.?\d*){3,4}\s*$/);
-  if (!trailingMatch) return null;
-
-  const nums = extractNumbers(trailingMatch[0]);
-  if (nums.length < 3) return null;
-
-  // name is everything before the trailing numeric groups
-  const name = rest.slice(0, rest.length - trailingMatch[0].length).trim() || ticker.replace('.NS', '').replace('.BO', '');
-
-  // From right: value, price, qty (facevalue is further left)
-  const value = nums[nums.length - 1];
-  const marketPrice = nums[nums.length - 2] ?? null;
-  const quantity = nums[nums.length - 3] ?? 0;
-
-  return { ticker, name, quantity, marketPrice, value };
-}
-
+// ─── Parser ────────────────────────────────────────────────────────────────────
 function parseAll(lines: string[]): {
   equities: CASEquityHolding[];
   mutualFunds: CASMutualFund[];
 } {
   const equities: CASEquityHolding[] = [];
-  const mutualFunds: CASMutualFund[] = [];
+  // Aggregate MFs by ISIN+scheme so that multi-folio holdings collapse into one row
+  const mfByKey = new Map<string, CASMutualFund>();
 
-  let i = 0;
-  while (i < lines.length) {
+  // Collect MF continuation lines (lines without ISIN that follow an MF row).
+  // Limit to a small window so we don't sweep up unrelated trailing text.
+  let lastMfKey: string | null = null;
+  let mfContinuationCount = 0;
+  const MAX_MF_CONTINUATION_LINES = 2;
+
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    if (!line) continue;
 
-    // ── Standalone ISIN (NSDL equity or MF) ──────────────────────────────────
-    const standaloneMatch = STANDALONE_ISIN_RE.exec(line);
-    if (standaloneMatch) {
-      const isin = standaloneMatch[1];
+    // ── NSDL Equity ─────────────────────────────────────────────────────────
+    const nsdlMatch = NSDL_EQUITY_RE.exec(line);
+    if (nsdlMatch) {
+      const [, isin, rawName, /* faceValue */, qtyStr, priceStr, valueStr] = nsdlMatch;
+      let name = rawName.trim();
 
-      // Skip to next non-empty line
-      let j = i + 1;
-      while (j < lines.length && !lines[j].trim()) j++;
-
-      if (isin.startsWith('INF')) {
-        // ── Mutual Fund ───────────────────────────────────────────────────────
-        // Collect description lines until we hit a digit-starting line (data)
-        const descLines: string[] = [];
-        let k = j;
-        while (k < lines.length) {
-          const l = lines[k].trim();
-          if (!l) { k++; continue; }
-          if (STANDALONE_ISIN_RE.test(l) || CDSL_INLINE_RE.test(l)) break;
-
-          if (/^\d/.test(l)) {
-            // Could be folio+data line or pure-data line
-            // Check if line might have mixed scheme text + folio (folio is 10+ digits embedded)
-            const allTextBeforeDigit = l.match(/^[^\d]*/)?.[0]?.trim();
-            if (allTextBeforeDigit) {
-              descLines.push(allTextBeforeDigit.replace(/^NOT\s+AVAILABLE\s+/i, '').trim());
-            }
-            break;
-          }
-
-          // Some lines start with "NOT AVAILABLE" (UCC placeholder) — strip it
-          descLines.push(l.replace(/^NOT\s+AVAILABLE\s+/i, '').trim());
-          k++;
-        }
-
-        let schemeName = descLines.filter(Boolean).join(' ').trim();
-        if (!schemeName) schemeName = isin;
-
-        // Collect numbers from up to 3 lines starting at k
-        const allNums: number[] = [];
-        let dataEnd = k;
-        for (let m = k; m < Math.min(lines.length, k + 3) && allNums.length < 8; m++) {
-          const dl = lines[m].trim();
-          if (!dl) continue;
-          if (STANDALONE_ISIN_RE.test(dl) || CDSL_INLINE_RE.test(dl)) break;
-          allNums.push(...extractNumbers(dl));
-          dataEnd = m + 1;
-        }
-
-        if (allNums.length >= 2) {
-          // If first number looks like a folio (large integer ≥ 1e8), skip it
-          const offset = allNums[0] >= 1e8 ? 1 : 0;
-          const units = allNums[offset] ?? 0;
-          // Columns: units, avgcost, totalcost, currentNAV, currentValue, pnl, return
-          const nav = allNums.length > offset + 3 ? (allNums[offset + 3] ?? null) : null;
-          const value = allNums.length > offset + 4
-            ? (allNums[offset + 4] ?? 0)
-            : (allNums[allNums.length - 1] ?? 0);
-
-          if (units > 0) {
-            mutualFunds.push({ isin, schemeName, units, nav, value });
-          }
-        }
-
-        i = dataEnd;
-        continue;
-      } else {
-        // ── NSDL Equity ───────────────────────────────────────────────────────
-        if (j < lines.length) {
-          const parsed = parseNSDLDataLine(lines[j].trim());
-          if (parsed && parsed.quantity > 0) {
-            equities.push({
-              isin,
-              name: parsed.name,
-              quantity: parsed.quantity,
-              marketPrice: parsed.marketPrice,
-              value: parsed.value,
-              ticker: parsed.ticker,
-            });
-            i = j + 1;
-            continue;
-          }
-        }
-        i++;
-        continue;
-      }
-    }
-
-    // ── CDSL Inline ISIN+Name line ────────────────────────────────────────────
-    const cdslMatch = CDSL_INLINE_RE.exec(line);
-    if (cdslMatch) {
-      const isin = cdslMatch[1];
-      const name = cdslMatch[2].trim();
-
-      let j = i + 1;
-      let quantity = 0;
-      let marketPrice: number | null = null;
-      let value = 0;
-      let found = false;
-
-      // Search for "# EQUITY SHARES <qty>" in the next ~20 lines
-      while (j < lines.length && j - i < 25) {
-        const l = lines[j].trim();
-        if (!l) { j++; continue; }
-        // New ISIN entry = stop
-        if (STANDALONE_ISIN_RE.test(l) || CDSL_INLINE_RE.test(l)) break;
-
-        const esMatch = EQUITY_SHARES_RE.exec(l);
-        if (esMatch) {
-          quantity = parseNum(esMatch[1]) ?? 0;
-          found = true;
-          j++;
-
-          // Skip balance breakdown (decimal-only lines, up to 12)
-          let skipped = 0;
-          while (j < lines.length && skipped < 12) {
-            const bl = lines[j].trim();
-            if (!bl) { j++; continue; }
-            if (DECIMAL_ONLY_RE.test(bl)) {
-              skipped++;
-              j++;
-              continue;
-            }
-            // Price + value line
-            const pvMatch = TWO_NUMS_RE.exec(bl);
-            if (pvMatch) {
-              marketPrice = parseNum(pvMatch[1]);
-              value = parseNum(pvMatch[2]) ?? 0;
-              j++;
-            }
-            break;
-          }
-          break;
-        }
-
-        j++;
+      // Look at next line for ticker
+      let ticker: string | undefined;
+      const next = lines[i + 1]?.trim() ?? '';
+      const tickerMatch = NSDL_TICKER_RE.exec(next);
+      if (tickerMatch) {
+        const [, sym, exch, nameTail] = tickerMatch;
+        ticker = `${sym}.${exch === 'NSE' ? 'NS' : 'BO'}`;
+        if (nameTail) name = `${name} ${nameTail}`.replace(/\s+/g, ' ').trim();
+        i++; // consume ticker line
       }
 
-      if (found && quantity > 0) {
-        equities.push({ isin, name, quantity, marketPrice, value });
+      const quantity = parseNum(qtyStr);
+      const marketPrice = parseNum(priceStr);
+      const value = parseNum(valueStr);
+      if (quantity > 0) {
+        equities.push({ isin, name, quantity, marketPrice, value, ticker });
       }
-      i++;
+      lastMfKey = null;
       continue;
     }
 
-    i++;
+    // ── CDSL Equity ─────────────────────────────────────────────────────────
+    const cdslMatch = CDSL_EQUITY_RE.exec(line);
+    if (cdslMatch) {
+      const [, isin, rawName, qtyStr, , , priceStr, valueStr] = cdslMatch;
+      const name = rawName.trim().replace(/\s+/g, ' ');
+      const quantity = parseNum(qtyStr);
+      const marketPrice = parseNum(priceStr);
+      const value = parseNum(valueStr);
+      if (quantity > 0) {
+        equities.push({ isin, name, quantity, marketPrice, value });
+      }
+      lastMfKey = null;
+      continue;
+    }
+
+    // ── Mutual Fund ─────────────────────────────────────────────────────────
+    const mfMatch = MF_RE.exec(line);
+    if (mfMatch) {
+      const [, isin, rawScheme, , unitsStr, , , navStr, valueStr] = mfMatch;
+      const scheme = rawScheme.trim().replace(/\s+/g, ' ');
+      const units = parseNum(unitsStr);
+      const nav = parseNum(navStr);
+      const value = parseNum(valueStr);
+
+      const key = `${isin}|${scheme}`;
+      const existing = mfByKey.get(key);
+      if (existing) {
+        existing.units += units;
+        existing.value += value;
+      } else {
+        mfByKey.set(key, { isin, schemeName: scheme, units, nav, value });
+      }
+      lastMfKey = key;
+      mfContinuationCount = 0;
+      continue;
+    }
+
+    // ── Continuation line for last MF (scheme name spans multiple lines) ───
+    if (lastMfKey && mfContinuationCount < MAX_MF_CONTINUATION_LINES && !ISIN_AT_START_RE.test(line)) {
+      const mf = mfByKey.get(lastMfKey)!;
+      const cleaned = line.replace(/^NOT\s+AVAILABLE\s+/i, '').trim();
+      if (cleaned && !/^[\d.,\s%-]+$/.test(cleaned) && cleaned.length < 60) {
+        if (!mf.schemeName.toLowerCase().includes(cleaned.toLowerCase().slice(0, 10))) {
+          mf.schemeName = `${mf.schemeName} ${cleaned}`.replace(/\s+/g, ' ').trim();
+        }
+      }
+      mfContinuationCount++;
+      continue;
+    }
+
+    lastMfKey = null;
+    mfContinuationCount = 0;
   }
 
-  return { equities, mutualFunds };
+  return { equities, mutualFunds: Array.from(mfByKey.values()) };
 }
 
 async function extractPdfText(fileBuffer: Buffer, password: string): Promise<string> {
@@ -252,10 +161,25 @@ async function extractPdfText(fileBuffer: Buffer, password: string): Promise<str
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    const pageText = (content.items as Array<{ str?: string }>)
-      .map(item => item.str ?? '')
-      .join('\n');
-    pageTexts.push(pageText);
+    type Item = { str?: string; transform?: number[] };
+    const items = (content.items as Item[]).filter(it => it.transform);
+
+    // Group items by Y coordinate so items on the same line are joined.
+    // Within each line, sort by X and concatenate.
+    const lineMap = new Map<number, Item[]>();
+    for (const it of items) {
+      const y = Math.round(it.transform![5]);
+      if (!lineMap.has(y)) lineMap.set(y, []);
+      lineMap.get(y)!.push(it);
+    }
+    const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
+    const lines: string[] = [];
+    for (const y of sortedYs) {
+      const lineItems = lineMap.get(y)!.sort((a, b) => a.transform![4] - b.transform![4]);
+      const text = lineItems.map(it => it.str ?? '').join('').replace(/\s+/g, ' ').trim();
+      if (text) lines.push(text);
+    }
+    pageTexts.push(lines.join('\n'));
     page.cleanup();
   }
 
