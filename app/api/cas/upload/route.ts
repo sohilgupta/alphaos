@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid PDF password' }, { status: 422 });
     }
     console.error('CAS parse error:', msg);
-    return NextResponse.json({ error: 'Failed to parse CAS PDF' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to parse CAS PDF', detail: msg }, { status: 500 });
   }
 
   const equities = normalizeEquities(parsed.equities);
