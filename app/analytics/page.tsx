@@ -25,16 +25,21 @@ export default function AnalyticsPage() {
   const isOwner = role === 'owner';
   const { data, isLoading } = useQuery({ queryKey: ['stocks'], queryFn: fetchStocks });
   const stocks: MergedStock[] = data?.stocks ?? [];
-  const portfolioTotalValue = useMemo(() => stocks.filter(s => s.isInPortfolio).reduce((sum, s) => sum + (s.portfolioData?.investedValue || 0), 0), [stocks]);
+  // Analytics is scoped to portfolio holdings only
+  const portfolioStocks = useMemo(() => stocks.filter(s => s.isInPortfolio), [stocks]);
+  const portfolioTotalValue = useMemo(
+    () => portfolioStocks.reduce((sum, s) => sum + (s.portfolioData?.investedValue || 0), 0),
+    [portfolioStocks]
+  );
 
   // Portfolio Intelligence
   const portfolioIntelligence = useMemo(() => {
-    const impulsive = stocks.filter(s => s.isInPortfolio && !s.isInWatchlist);
+    const impulsive = portfolioStocks.filter(s => !s.isInWatchlist);
     const convictionButNotBought = stocks.filter(s => s.isInWatchlist && !s.isInPortfolio && s.convictionScore > 7);
-    
-    // Group by theme (suggested or original)
+
+    // Group by theme (suggested or original) — tracked from full watchlist, held from portfolio
     const themeMap = new Map<string, { tracked: number; held: number; investedValue: number }>();
-    
+
     for (const s of stocks) {
       const theme = s.suggestedTheme || s.originalTheme || 'Uncategorized';
       if (!themeMap.has(theme)) {
@@ -62,10 +67,10 @@ export default function AnalyticsPage() {
     return { impulsive, convictionButNotBought, themeAllocations };
   }, [stocks, portfolioTotalValue]);
 
-  // Category Performance
+  // Category Performance — portfolio stocks only
   const categoryPerf: CategoryPerformance[] = useMemo(() => {
     const map = new Map<string, MergedStock[]>();
-    for (const s of stocks) {
+    for (const s of portfolioStocks) {
       if (!s.category) continue;
       if (!map.has(s.category)) map.set(s.category, []);
       map.get(s.category)!.push(s);
@@ -92,30 +97,30 @@ export default function AnalyticsPage() {
         worstPerformer: sorted1Y[sorted1Y.length - 1]?.ticker ?? '',
       };
     }).sort((a, b) => b.avgGain1Y - a.avgGain1Y);
-  }, [stocks]);
+  }, [portfolioStocks]);
 
-  // Top 10 gainers / losers by 1Y
+  // Top 10 gainers / losers by 1Y — portfolio only
   const sortedBy1Y = useMemo(() =>
-    [...stocks].filter(s => s.gain1Y != null).sort((a, b) => (b.gain1Y ?? 0) - (a.gain1Y ?? 0)),
-    [stocks]
+    [...portfolioStocks].filter(s => s.gain1Y != null).sort((a, b) => (b.gain1Y ?? 0) - (a.gain1Y ?? 0)),
+    [portfolioStocks]
   );
   const gainers1Y = sortedBy1Y.slice(0, 10);
   const losers1Y = [...sortedBy1Y].reverse().slice(0, 10);
 
   const avgPortfolioToday = useMemo(() => {
-    const w = stocks.filter(s => s.live?.changePercent != null);
+    const w = portfolioStocks.filter(s => s.live?.changePercent != null);
     return w.length ? w.reduce((a, s) => a + s.live!.changePercent, 0) / w.length : 0;
-  }, [stocks]);
+  }, [portfolioStocks]);
 
   const avg1M = useMemo(() => {
-    const w = stocks.filter(s => s.gain1M != null);
+    const w = portfolioStocks.filter(s => s.gain1M != null);
     return w.length ? w.reduce((a, s) => a + (s.gain1M ?? 0), 0) / w.length : 0;
-  }, [stocks]);
+  }, [portfolioStocks]);
 
   const avg1Y = useMemo(() => {
-    const w = stocks.filter(s => s.gain1Y != null);
+    const w = portfolioStocks.filter(s => s.gain1Y != null);
     return w.length ? w.reduce((a, s) => a + (s.gain1Y ?? 0), 0) / w.length : 0;
-  }, [stocks]);
+  }, [portfolioStocks]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -158,7 +163,7 @@ export default function AnalyticsPage() {
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-800 text-foreground tracking-tight">Portfolio Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Equal-weighted performance across all {stocks.length} positions</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Equal-weighted performance across {portfolioStocks.length} portfolio positions</p>
       </div>
 
       {/* Portfolio Intelligence Section */}
