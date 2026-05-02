@@ -9,8 +9,9 @@ const nextConfig: NextConfig = {
   },
   // Empty turbopack config silences the Turbopack/webpack conflict warning
   turbopack: {},
-  // Mark yahoo-finance2 as a server-only package
-  serverExternalPackages: ['yahoo-finance2'],
+  // Keep these packages un-bundled so their internal file paths
+  // (pdfjs worker, canvas bindings) remain valid at runtime on Vercel.
+  serverExternalPackages: ['yahoo-finance2', 'pdf-parse', 'pdfjs-dist'],
 };
 
 export default nextConfig;

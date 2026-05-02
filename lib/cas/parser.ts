@@ -229,11 +229,12 @@ function parseAll(lines: string[]): {
 }
 
 export async function parseCASPdf(fileBuffer: Buffer, password: string): Promise<ParsedCAS> {
-  const { PDFParse } = await import('pdf-parse');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PDFParse } = require('pdf-parse') as { PDFParse: new (opts: Record<string, unknown>) => { getText(): Promise<{ text: string }>; destroy(): Promise<void> } };
 
   const parser = new PDFParse({
     data: fileBuffer,
-    password: password || undefined,
+    ...(password ? { password } : {}),
   });
 
   let text: string;
