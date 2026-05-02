@@ -1,4 +1,5 @@
 import type { CASEquityHolding, CASMutualFund, ParsedCAS } from './types';
+import { createRequire } from 'module';
 
 const PAN_RE = /\b[A-Z]{5}[0-9]{4}[A-Z]\b/g;
 
@@ -228,23 +229,42 @@ function parseAll(lines: string[]): {
   return { equities, mutualFunds };
 }
 
-export async function parseCASPdf(fileBuffer: Buffer, password: string): Promise<ParsedCAS> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { PDFParse } = require('pdf-parse') as { PDFParse: new (opts: Record<string, unknown>) => { getText(): Promise<{ text: string }>; destroy(): Promise<void> } };
+async function extractPdfText(fileBuffer: Buffer, password: string): Promise<string> {
+  // Use pdfjs-dist/legacy directly — avoids worker-path issues that pdf-parse
+  // encounters when bundled in Next.js serverless functions.
+  const _require = createRequire(import.meta.url);
+  const workerPath: string = _require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
 
-  const parser = new PDFParse({
-    data: fileBuffer,
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(fileBuffer),
     ...(password ? { password } : {}),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
   });
 
-  let text: string;
-  try {
-    const result = await parser.getText();
-    text = result.text;
-  } finally {
-    await parser.destroy().catch(() => {});
+  const pdf = await loadingTask.promise;
+  const pageTexts: string[] = [];
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const pageText = (content.items as Array<{ str?: string }>)
+      .map(item => item.str ?? '')
+      .join('\n');
+    pageTexts.push(pageText);
+    page.cleanup();
   }
 
+  await pdf.destroy();
+  return pageTexts.join('\n');
+}
+
+export async function parseCASPdf(fileBuffer: Buffer, password: string): Promise<ParsedCAS> {
+  const text = await extractPdfText(fileBuffer, password);
   const clean = stripPII(text);
 
   const dateMatch = clean.match(
