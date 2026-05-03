@@ -1,5 +1,6 @@
 import type { CASEquityHolding, CASMutualFund, ParsedCAS } from './types';
 import { createRequire } from 'module';
+import { pathToFileURL } from 'url';
 
 const PAN_RE = /\b[A-Z]{5}[0-9]{4}[A-Z]\b/g;
 
@@ -179,7 +180,9 @@ async function extractPdfText(fileBuffer: Buffer, password: string): Promise<str
   const workerPath: string = _require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
 
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+  // pathToFileURL handles platform-specific quirks (Linux requires file:///path
+  // with empty host; manual `file://${path}` can produce malformed URLs).
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
 
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(fileBuffer),
