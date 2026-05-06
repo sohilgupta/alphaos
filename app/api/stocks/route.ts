@@ -9,6 +9,7 @@ import type { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const maxDuration = 60; // seconds (respected on Vercel Pro/Enterprise)
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,18 +49,24 @@ export async function GET(request: NextRequest) {
       ...(isOwner ? indianPortfolio.map(s => s.ticker) : []),
     ]);
 
-    const tickersNeedingHistory = Array.from(tickers)
+    // Portfolio stocks: ALWAYS fetch history (no cap) — these are the ones the
+    // user cares most about seeing returns for.
+    const portfolioNeedingHistory = Array.from(portfolioTickers).filter(
+      ticker => liveQuotes.get(ticker)?.price
+    );
+
+    // Watchlist-only stocks missing sheet returns: fetch up to 25 to fill gaps
+    // without blowing the function time budget.
+    const watchlistNeedingHistory = Array.from(tickers)
       .filter(ticker => {
-        if (!(liveQuotes.get(ticker)?.price)) return false;
+        if (portfolioTickers.has(ticker)) return false; // already covered above
+        if (!liveQuotes.get(ticker)?.price) return false;
         const w = watchlistDataMap.get(ticker);
         return !w || w.gain6M == null || w.gain1Y == null;
       })
-      .sort((a, b) => {
-        const aPort = portfolioTickers.has(a) ? 0 : 1;
-        const bPort = portfolioTickers.has(b) ? 0 : 1;
-        return aPort - bPort;
-      })
-      .slice(0, 80); // cap to avoid request timeout
+      .slice(0, 25);
+
+    const tickersNeedingHistory = [...portfolioNeedingHistory, ...watchlistNeedingHistory];
 
     const historicalMap = tickersNeedingHistory.length > 0
       ? await getBatchHistoricalReturns(tickersNeedingHistory, liveQuotes)
