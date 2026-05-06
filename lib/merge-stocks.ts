@@ -49,7 +49,19 @@ function mergeData(
       else if (isInWatchlist) tags.push('WATCHLIST ONLY');
       else if (isInPortfolio) tags.push('PORTFOLIO ONLY');
 
-      const name = wData?.name || pData?.name || live?.shortName || ticker;
+      // If the stored name looks like a ticker code (e.g. "NMDC.NS", "519477.BO",
+      // or a raw number), prefer the live Yahoo Finance longName/shortName instead.
+      const rawName = wData?.name || pData?.name || null;
+      const isTickerCode = !rawName
+        || rawName === ticker
+        || /^\d+$/.test(rawName)
+        || /^[A-Z0-9&\-]+\.(NS|BO)$/i.test(rawName)
+        || rawName.startsWith('NSE:')
+        || rawName.startsWith('BSE:')
+        || rawName.startsWith('BOM:');
+      const name = isTickerCode
+        ? (live?.longName || live?.shortName || rawName || ticker)
+        : rawName;
       const description = wData?.description || '';
       const suggestion = suggestTheme({ name, description });
       const quantity = pData?.quantity;
