@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AlphaOS
 
-## Getting Started
+Investor-grade portfolio analytics + research pipeline.
 
-First, run the development server:
+## Layout
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+alphaos/
+├── dashboard/   Next.js app (Vercel-deployed). Reads Google Sheets, renders dashboard.
+├── research/    Python pipeline. Ingests sources, computes fair price, writes to Sheets.
+├── vault/       Obsidian vault — research data, themes, memos, raw articles. (Gitignored.)
+├── shared/      Schema contract between dashboard and research. Read this first.
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The seam between dashboard and research is the two Google Sheets listed in
+`shared/SCHEMA.md`. Research **writes** verdict / confidence / fair-price
+columns; dashboard **reads** them.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Dashboard
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd dashboard
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # production build (Vercel runs this)
+```
 
-## Learn More
+Vercel deploys the `dashboard/` subdirectory only — set **Root Directory** to
+`dashboard` in the Vercel project settings (Project → Settings → General).
 
-To learn more about Next.js, take a look at the following resources:
+## Research
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+cd research
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r scripts/requirements.txt
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Configure Google Sheets credentials (one-time)
+mkdir -p ~/.config/alphaos
+# place OAuth client credentials at ~/.config/alphaos/credentials.json
+python scripts/setup_sheets.py
 
-## Deploy on Vercel
+# Run the pipeline
+python scripts/pipeline.py run        # extract → fetch → score → sync
+python scripts/pipeline.py queue      # show tickers needing Claude valuation
+python scripts/pipeline.py sync       # push valuations to Sheets
+python scripts/watcher.py             # auto-trigger on new files in vault/raw/
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Scripts default to `vault/` for data. Override with `ALPHAOS_VAULT=/path/to/vault`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Vault
+
+Open `vault/` in Obsidian. The `.obsidian/` config travels with the repo;
+the data inside (data/, raw/, processed/, memos/, logs/) is gitignored.
+
+## Schema
+
+Anything that crosses the dashboard ↔ research boundary is documented in
+`shared/SCHEMA.md` — sheet column mappings, canonical verdict / confidence
+values, ticker formats. Update both sides when you change either.

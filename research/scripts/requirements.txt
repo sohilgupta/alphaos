@@ -1,0 +1,7 @@
+yfinance>=0.2.40
+matplotlib>=3.8.0
+watchdog>=4.0.0
+gspread>=6.0.0
+google-auth>=2.28.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0

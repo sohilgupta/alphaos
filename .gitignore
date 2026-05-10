@@ -1,41 +1,60 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# OS
 .DS_Store
 *.pem
 
-# debug
+# ── Dashboard (Next.js) ──────────────────────────────────────────────────────
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/build/
+dashboard/coverage/
+dashboard/.vercel
+dashboard/*.tsbuildinfo
+dashboard/next-env.d.ts
+dashboard/.pnp
+dashboard/.pnp.*
+dashboard/.yarn/*
+!dashboard/.yarn/patches
+!dashboard/.yarn/plugins
+!dashboard/.yarn/releases
+!dashboard/.yarn/versions
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Env (anywhere in repo)
 .env*
 
-# vercel
-.vercel
+# Credentials
+credentials.json
+**/credentials.json
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# ── Research (Python) ─────────────────────────────────────────────────────────
+research/.venv/
+research/**/__pycache__/
+research/**/*.pyc
+
+# ── Vault (Obsidian) ──────────────────────────────────────────────────────────
+# Data + raw sources are large + private. Keep .obsidian config tracked so the
+# vault opens cleanly; ignore everything else.
+vault/data/
+vault/raw/
+vault/processed/
+vault/memos/
+vault/logs/
+vault/archive/
+vault/inbox/
+vault/.obsidian/workspace*
+vault/.obsidian/cache
+vault/.trash/
+
+# Claude Code per-folder state
+**/.claude/scheduled_tasks.lock
+
+# Vercel link metadata at root (we keep dashboard/.vercel)
+.vercel
