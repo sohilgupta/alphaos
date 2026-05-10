@@ -1,6 +1,9 @@
 // lib/types.ts
 // Central type definitions for the entire app
 
+export type Verdict = 'Strong Buy' | 'Buy' | 'Watch' | 'Hold' | 'Reduce' | 'Avoid';
+export type Confidence = 'High' | 'Medium' | 'Low';
+
 export interface SheetStock {
   ticker: string;
   name: string;
@@ -16,6 +19,8 @@ export interface SheetStock {
   gain6M: number | null;
   gain1Y: number | null;
   gain3Y: number | null;
+  verdict: Verdict | null;
+  confidence: Confidence | null;
   region?: Region;
 }
 
@@ -108,11 +113,13 @@ export interface MergedStock {
   gain6M: number | null;
   gain1Y: number | null;
   gain3Y: number | null;
+  verdict: Verdict | null;
+  confidence: Confidence | null;
   live: LiveQuote | null;
   convictionScore: number;
   alertThreshold: number | null;
   tags: string[];
-  
+
   // New architecture fields
   isInWatchlist: boolean;
   isInPortfolio: boolean;

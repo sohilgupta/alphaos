@@ -111,6 +111,8 @@ function mergeData(
         originalTheme: wData?.category,
         suggestedTheme: suggestion?.theme,
         themeConfidence: suggestion?.confidence,
+        verdict: wData?.verdict ?? null,
+        confidence: wData?.confidence ?? null,
       };
 
       return owner ? stock : sanitizeForPublic(stock);

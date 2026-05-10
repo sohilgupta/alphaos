@@ -1,4 +1,4 @@
-import type { PortfolioStock, SheetStock } from '@/lib/types';
+import type { PortfolioStock, SheetStock, Verdict, Confidence } from '@/lib/types';
 import { getCache, setCache } from '@/lib/cache';
 
 const INDIAN_SHEET_ID = '1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM';
@@ -30,6 +30,22 @@ async function fetchGvizTable(sheet: string): Promise<GoogleTable> {
   const parsed = JSON.parse(match[1]);
   if (parsed.status !== 'ok') throw new Error(parsed.errors?.[0]?.detailed_message || `Failed to load "${sheet}"`);
   return parsed.table;
+}
+
+const VALID_VERDICTS = new Set(['Strong Buy', 'Buy', 'Watch', 'Hold', 'Reduce', 'Avoid']);
+function parseVerdict(val: unknown): Verdict | null {
+  if (!val) return null;
+  const t = String(val).trim();
+  const match = [...VALID_VERDICTS].find(v => v.toLowerCase() === t.toLowerCase());
+  return (match as Verdict) ?? null;
+}
+function parseConfidence(val: unknown): Confidence | null {
+  if (!val) return null;
+  const t = String(val).trim().toLowerCase();
+  if (t === 'high') return 'High';
+  if (t === 'medium' || t === 'mid') return 'Medium';
+  if (t === 'low') return 'Low';
+  return null;
 }
 
 function normalizeHeader(value: string) {
@@ -143,6 +159,8 @@ export async function getIndianWatchlist(forceRefresh = false): Promise<SheetSto
       const idx6M = headerIndex(headers, '6 month');
       const idx1Y = headerIndex(headers, '1 year');
       const idx3Y = headerIndex(headers, '3 year');
+      const idxVerdict = headerIndex(headers, 'verdict');
+      const idxConfidence = headerIndex(headers, 'confidence');
       const category = categoryFromFirstHeader(rawHeaders[0] || '', categoryFallback);
 
       for (const row of table.rows) {
@@ -165,6 +183,8 @@ export async function getIndianWatchlist(forceRefresh = false): Promise<SheetSto
           gain6M: parsePercent(cellValue(values, idx6M)),
           gain1Y: parsePercent(cellValue(values, idx1Y)),
           gain3Y: parsePercent(cellValue(values, idx3Y)),
+          verdict: parseVerdict(idxVerdict >= 0 ? cellValue(values, idxVerdict) : null),
+          confidence: parseConfidence(idxConfidence >= 0 ? cellValue(values, idxConfidence) : null),
           region: 'INDIA',
         });
       }

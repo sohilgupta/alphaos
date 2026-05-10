@@ -2,8 +2,27 @@
 // Fetches and parses stock data from Google Sheets CSV export
 
 import Papa from 'papaparse';
-import { SheetStock } from './types';
+import { SheetStock, Verdict, Confidence } from './types';
 import { getCache, setCache } from './cache';
+
+const VALID_VERDICTS = new Set(['Strong Buy', 'Buy', 'Watch', 'Hold', 'Reduce', 'Avoid']);
+
+function parseVerdict(val: string | undefined): Verdict | null {
+  if (!val) return null;
+  const trimmed = val.trim();
+  // Case-insensitive match
+  const match = [...VALID_VERDICTS].find(v => v.toLowerCase() === trimmed.toLowerCase());
+  return (match as Verdict) ?? null;
+}
+
+function parseConfidence(val: string | undefined): Confidence | null {
+  if (!val) return null;
+  const t = val.trim().toLowerCase();
+  if (t === 'high') return 'High';
+  if (t === 'medium' || t === 'mid') return 'Medium';
+  if (t === 'low') return 'Low';
+  return null;
+}
 
 const SHEET_ID = '1HVEG6wtWsm68o3YMgznhhLrlENOARqF41kqrcbJlqq4';
 const WATCHLIST_TTL = 10 * 60 * 1000; // 10 min
@@ -80,6 +99,8 @@ function parseTabCsv(csvText: string, tabName: string): SheetStock[] {
       const idx6M = headerRow.findIndex(h => h.includes('6 m') || h === '6m gain' || h.includes('6 month'));
       const idx1Y = headerRow.findIndex(h => h.includes('1 y') || h === '1y gain' || h.includes('1 year'));
       const idx3Y = headerRow.findIndex(h => h.includes('3 y') || h === '3y gain' || h.includes('3 year'));
+      const idxVerdict = headerRow.findIndex(h => h.includes('verdict'));
+      const idxConfidence = headerRow.findIndex(h => h.includes('confidence'));
 
       stocks.push({
         ticker,
@@ -96,6 +117,8 @@ function parseTabCsv(csvText: string, tabName: string): SheetStock[] {
         gain6M: parsePercent(idx6M >= 0 ? row[idx6M] : undefined),
         gain1Y: parsePercent(idx1Y >= 0 ? row[idx1Y] : undefined),
         gain3Y: parsePercent(idx3Y >= 0 ? row[idx3Y] : undefined),
+        verdict: parseVerdict(idxVerdict >= 0 ? row[idxVerdict] : undefined),
+        confidence: parseConfidence(idxConfidence >= 0 ? row[idxConfidence] : undefined),
         region: 'US',
       });
     }
