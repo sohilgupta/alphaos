@@ -436,7 +436,24 @@ export default function StockTable({ stocks, isLoading }: Props) {
         )}
       </div>
 
-      {view === 'grid' ? (
+      {sorted.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] py-12 px-6 text-center">
+          <div className="text-sm font-600 text-foreground mb-1">No stocks match this filter</div>
+          <div className="text-xs text-muted-foreground max-w-md mx-auto">
+            {quickFilter?.kind === 'verdict' && `No stocks tagged "${quickFilter.verdict}" in the current sheet. Add a Verdict column to the Google Sheet to populate this.`}
+            {quickFilter?.kind === 'confidence' && 'No stocks tagged High Confidence. Add a Confidence column to the Google Sheet to populate this.'}
+            {quickFilter?.kind === 'upside' && 'No stocks have a Fair Price / Potential Gain set in the sheet.'}
+            {quickFilter?.kind === 'overvalued' && 'No stocks are currently flagged as overvalued (potential gain < -5%).'}
+            {quickFilter?.kind === 'weakening' && 'No stocks are weakening short-term while positive on 1Y.'}
+            {(!quickFilter || quickFilter.kind === 'timeframe') && 'Try clearing the search or filter.'}
+          </div>
+          {quickFilter && (
+            <button onClick={() => setQuickFilter(null)}
+              className="mt-4 px-3 py-1.5 rounded-md text-xs font-600 border border-white/10 bg-white/5 text-foreground hover:bg-white/10 transition-colors"
+            >Clear filter</button>
+          )}
+        </div>
+      ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {sorted.map(stock => (
             <div key={stock.ticker} onClick={() => router.push(`/stock/${stock.ticker}`)}
