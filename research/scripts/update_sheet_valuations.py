@@ -42,15 +42,7 @@ SHEETS = {
         "fv_col":         "G",
         "verdict_col":    "I",
         "confidence_col": "J",
-        # Per-tab overrides — exact tab title match
-        "tab_overrides": {
-            "US_portfolio": {
-                "ticker_col_letter": "B",
-                "fv_col":         "L",
-                "verdict_col":    "N",
-                "confidence_col": "O",
-            },
-        },
+        "tab_overrides": {},
     },
     "india": {
         "id": "1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM",
@@ -58,7 +50,14 @@ SHEETS = {
         "fv_col":         "F",
         "verdict_col":    "H",
         "confidence_col": "I",
+        # Both portfolio tabs live in this spreadsheet
         "tab_overrides": {
+            "US_portfolio": {
+                "ticker_col_letter": "B",
+                "fv_col":         "L",
+                "verdict_col":    "N",
+                "confidence_col": "O",
+            },
             "India_portfolio": {
                 "ticker_col_letter": "B",
                 "fv_col":         "Q",
@@ -271,18 +270,24 @@ def main():
     not_found = []
 
     for region, vals in by_region.items():
-        if not vals:
-            continue
         cfg = SHEETS[region]
+        has_overrides = bool(cfg.get("tab_overrides"))
+        if not vals and not has_overrides:
+            continue
         print(f"\n── {region.upper()} sheet ──")
         ss = gc.open_by_key(cfg["id"])
 
         # Aggregate matches across tabs
         region_matched: set = set()
+        overrides = cfg.get("tab_overrides", {})
 
         for ws in ss.worksheets():
             tab_cfg = resolve_tab_cfg(cfg, ws.title)
-            updates, matched = build_updates_for_tab(ws, tab_cfg, vals)
+            # Portfolio tabs (overrides) may contain tickers from other
+            # regions (e.g. US_portfolio lives in the India spreadsheet).
+            # Pass all valuations for override tabs so nothing is missed.
+            tab_vals = valuations if ws.title in overrides else vals
+            updates, matched = build_updates_for_tab(ws, tab_cfg, tab_vals)
             if not matched:
                 continue
             print(f"  Tab: {ws.title!r:<40} → {len(matched)} ticker(s), {len(updates)} cell update(s)")
