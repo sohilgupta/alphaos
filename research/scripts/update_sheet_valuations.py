@@ -2,9 +2,13 @@
 Update existing rows in the Google Sheets watchlists with the latest
 valuation data: Fair Price, Verdict, Confidence.
 
-Column mapping:
+Column mapping (defaults — apply to all watchlist tabs):
   US sheet:    B=Ticker  G=FairPrice  I=Verdict  J=Confidence
   India sheet: B=nse:xxx F=FairPrice  H=Verdict  I=Confidence
+
+Per-tab overrides (portfolio tabs have different column layouts):
+  US_portfolio:    B=Ticker  L=FairPrice  N=Verdict  O=Confidence
+  India_portfolio: B=Ticker  Q=FairPrice  S=Verdict  T=Confidence
 
 Uses batch_update per worksheet to stay under the 60 writes/min quota.
 
@@ -32,20 +36,51 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 SHEETS = {
     "us": {
-        "id":       "1HVEG6wtWsm68o3YMgznhhLrlENOARqF41kqrcbJlqq4",
+        "id": "1HVEG6wtWsm68o3YMgznhhLrlENOARqF41kqrcbJlqq4",
+        # Defaults (applied to every watchlist tab)
         "ticker_col_letter": "B",
-        "fv_col":      "G",
-        "verdict_col": "I",
+        "fv_col":         "G",
+        "verdict_col":    "I",
         "confidence_col": "J",
+        # Per-tab overrides — exact tab title match
+        "tab_overrides": {
+            "US_portfolio": {
+                "ticker_col_letter": "B",
+                "fv_col":         "L",
+                "verdict_col":    "N",
+                "confidence_col": "O",
+            },
+        },
     },
     "india": {
-        "id":       "1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM",
+        "id": "1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM",
         "ticker_col_letter": "B",
-        "fv_col":      "F",
-        "verdict_col": "H",
+        "fv_col":         "F",
+        "verdict_col":    "H",
         "confidence_col": "I",
+        "tab_overrides": {
+            "India_portfolio": {
+                "ticker_col_letter": "B",
+                "fv_col":         "Q",
+                "verdict_col":    "S",
+                "confidence_col": "T",
+            },
+        },
     },
 }
+
+
+def resolve_tab_cfg(region_cfg: dict, tab_title: str) -> dict:
+    """Return the column config for a worksheet, applying any per-tab override."""
+    overrides = region_cfg.get("tab_overrides", {})
+    if tab_title in overrides:
+        return overrides[tab_title]
+    return {
+        "ticker_col_letter": region_cfg["ticker_col_letter"],
+        "fv_col":         region_cfg["fv_col"],
+        "verdict_col":    region_cfg["verdict_col"],
+        "confidence_col": region_cfg["confidence_col"],
+    }
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -246,7 +281,8 @@ def main():
         region_matched: set = set()
 
         for ws in ss.worksheets():
-            updates, matched = build_updates_for_tab(ws, cfg, vals)
+            tab_cfg = resolve_tab_cfg(cfg, ws.title)
+            updates, matched = build_updates_for_tab(ws, tab_cfg, vals)
             if not matched:
                 continue
             print(f"  Tab: {ws.title!r:<40} → {len(matched)} ticker(s), {len(updates)} cell update(s)")

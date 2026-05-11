@@ -209,7 +209,23 @@ export async function fetchPortfolioStocks(forceRefresh = false): Promise<import
         investedValue = quantity * avgBuyPrice;
       }
 
-      stocks.push({ ticker, name: name.toString().trim(), quantity, avgBuyPrice, investedValue });
+      // New columns added to US_portfolio: Fair price, Upside, Verdict, Confidence
+      const fairPrice = parseNumber(row['Fair price'] ?? row['Fair Price'] ?? row['fair price']);
+      const potentialGain = parsePercent(row['Upside'] ?? row['Potential gain'] ?? row['Potential Gain']);
+      const verdict = parseVerdict(row['Verdict'] ?? row['verdict']);
+      const confidence = parseConfidence(row['Confidence'] ?? row['confidence']);
+
+      stocks.push({
+        ticker,
+        name: name.toString().trim(),
+        quantity,
+        avgBuyPrice,
+        investedValue,
+        fairPrice,
+        potentialGain,
+        verdict,
+        confidence,
+      });
     }
   } catch (e) {
     console.error('Failed to fetch portfolio:', e);

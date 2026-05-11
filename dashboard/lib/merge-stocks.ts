@@ -86,8 +86,8 @@ function mergeData(
         description,
         marketCapSheet: wData?.marketCapSheet ?? null,
         currentPriceSheet: wData?.currentPriceSheet ?? null,
-        fairPrice: wData?.fairPrice ?? null,
-        potentialGain: wData?.potentialGain ?? null,
+        fairPrice: wData?.fairPrice ?? pData?.fairPrice ?? null,
+        potentialGain: wData?.potentialGain ?? pData?.potentialGain ?? null,
         gain1W,
         gain1M,
         gain6M: wData?.gain6M ?? hist?.gain6M ?? null,
@@ -111,8 +111,8 @@ function mergeData(
         originalTheme: wData?.category,
         suggestedTheme: suggestion?.theme,
         themeConfidence: suggestion?.confidence,
-        verdict: wData?.verdict ?? null,
-        confidence: wData?.confidence ?? null,
+        verdict: wData?.verdict ?? pData?.verdict ?? null,
+        confidence: wData?.confidence ?? pData?.confidence ?? null,
       };
 
       return owner ? stock : sanitizeForPublic(stock);

@@ -101,13 +101,24 @@ export async function getIndianPortfolio(forceRefresh = false): Promise<Portfoli
   const stocks: PortfolioStock[] = [];
 
   try {
-    const table = await fetchGvizTable('Trendlyne portfolio');
+    // Tab renamed from 'Trendlyne portfolio' → 'India_portfolio'. Fall back to
+    // the old name for backwards-compat in case rollback is needed.
+    let table: GoogleTable;
+    try {
+      table = await fetchGvizTable('India_portfolio');
+    } catch {
+      table = await fetchGvizTable('Trendlyne portfolio');
+    }
     const headers = table.cols.map(col => normalizeHeader(col.label));
     const idxTicker = headerIndex(headers, 'nsecode', 'bsecode', 'stock code');
     const idxName = headerIndex(headers, 'stock name');
     const idxQuantity = headerIndex(headers, 'quantity');
     const idxAvgBuyPrice = headerIndex(headers, 'avg. buy price', 'avg buy price', 'purchase price');
     const idxInvested = headerIndex(headers, 'invested amount', 'starting value', 'invested value');
+    const idxFairPrice = headerIndex(headers, 'fair price', 'intrinsic price');
+    const idxUpside = headerIndex(headers, 'upside', 'potential gain', 'potential');
+    const idxVerdict = headerIndex(headers, 'verdict');
+    const idxConfidence = headerIndex(headers, 'confidence');
 
     for (const row of table.rows) {
       const values = row.c;
@@ -127,6 +138,10 @@ export async function getIndianPortfolio(forceRefresh = false): Promise<Portfoli
         quantity,
         avgBuyPrice,
         investedValue,
+        fairPrice: parseNumber(cellValue(values, idxFairPrice)),
+        potentialGain: parsePercent(cellValue(values, idxUpside)),
+        verdict: parseVerdict(idxVerdict >= 0 ? cellValue(values, idxVerdict) : null),
+        confidence: parseConfidence(idxConfidence >= 0 ? cellValue(values, idxConfidence) : null),
       });
     }
   } catch (error) {

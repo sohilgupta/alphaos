@@ -71,6 +71,11 @@ export interface PortfolioStock {
   quantity: number;
   avgBuyPrice: number;
   investedValue: number;
+  // Optional valuation enrichment written by research/scripts/update_sheet_valuations.py
+  fairPrice?: number | null;
+  potentialGain?: number | null;
+  verdict?: Verdict | null;
+  confidence?: Confidence | null;
 }
 
 export type UserRole = 'public' | 'owner';
