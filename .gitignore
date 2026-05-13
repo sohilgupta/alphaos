@@ -58,3 +58,11 @@ vault/.trash/
 
 # Vercel link metadata at root (we keep dashboard/.vercel)
 .vercel
+vault/nsdl/cas_pdfs/
+vault/nsdl/parsed_json/
+vault/nsdl/data/
+
+# nsdl_cas Python artifacts
+nsdl_cas/.venv/
+nsdl_cas/**/__pycache__/
+nsdl_cas/**/*.pyc
