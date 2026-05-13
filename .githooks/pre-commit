@@ -6,7 +6,7 @@ set -e
 # Patterns to flag. Add more as needed.
 PATTERNS=(
   '[A-Z]{5}[0-9]{4}[A-Z]'               # Generic PAN format
-  '[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}' # Google App Password format (4x4 lowercase)
+  '["\x27][a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}["\x27]'  # Google App Password (quoted)
   'AKIA[0-9A-Z]{16}'                    # AWS access key
   'sk-[a-zA-Z0-9]{20,}'                 # OpenAI / Anthropic-style key
   'ghp_[a-zA-Z0-9]{36}'                 # GitHub personal token

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, ChevronRight, Shield, LockOpen } from 'lucide-react';
+import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, ChevronRight, Shield, LockOpen, Wallet } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -20,6 +20,7 @@ export default function Sidebar() {
         { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
         { href: '/portfolio', label: 'Portfolio', icon: TrendingUp },
         { href: '/analytics', label: 'Dashboard', icon: Filter },
+        { href: '/nsdl',      label: 'Net Worth', icon: Wallet },
       ]
     : [
         { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
