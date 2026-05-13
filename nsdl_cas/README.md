@@ -17,8 +17,7 @@ alphaos/
 │   │   ├── ingest.py             JSON → SQLite ingestion
 │   │   ├── ingest_latest.py      One-shot rename + parse + ingest workflow
 │   │   ├── detect_missing.py     Missing-statement detector
-│   │   ├── gmail_fetch.py        Gmail OAuth downloader for missing PDFs
-│   │   └── nsdl_cas_to_excel.py  Excel export
+│   │   └── gmail_fetch.py        Gmail OAuth downloader for missing PDFs
 │   ├── requirements.txt
 │   └── README.md (this file)
 └── vault/nsdl/                  ← data (gitignored)

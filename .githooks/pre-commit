@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Pre-commit secret scanner. Blocks commits containing common secret patterns.
+# Enable: `git config core.hooksPath .githooks`
+set -e
+
+# Patterns to flag. Add more as needed.
+PATTERNS=(
+  '[A-Z]{5}[0-9]{4}[A-Z]'               # Generic PAN format
+  '[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}' # Google App Password format (4x4 lowercase)
+  'AKIA[0-9A-Z]{16}'                    # AWS access key
+  'sk-[a-zA-Z0-9]{20,}'                 # OpenAI / Anthropic-style key
+  'ghp_[a-zA-Z0-9]{36}'                 # GitHub personal token
+  'AIza[0-9A-Za-z_-]{35}'               # Google API key
+  '-----BEGIN .* PRIVATE KEY-----'      # Private key block
+)
+
+# Skip the hook directory itself — its pattern definitions trivially self-match.
+EXCLUDE_PATHS='\.githooks/'
+
+HITS=0
+for pattern in "${PATTERNS[@]}"; do
+  matches=$(git diff --cached -U0 --diff-filter=AM -- ':!.githooks' | grep -nE "^\+.*$pattern" || true)
+  if [ -n "$matches" ]; then
+    echo "🔴 BLOCKED: pattern '$pattern' found in staged changes:"
+    echo "$matches" | head -5
+    HITS=$((HITS+1))
+  fi
+done
+
+if [ "$HITS" -gt 0 ]; then
+  echo
+  echo "Pre-commit secret scan blocked $HITS pattern match(es)."
+  echo "If this is a false positive, bypass with --no-verify (last resort)."
+  exit 1
+fi
+exit 0
