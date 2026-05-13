@@ -6,7 +6,7 @@ import { TrendingUp, TrendingDown, DollarSign, PieChart, BarChart2 } from 'lucid
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatPercent, formatStockPrice, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
 import CASUpload from '@/components/dashboard/CASUpload';
 import MutualFundsTable from '@/components/dashboard/MutualFundsTable';
@@ -227,7 +227,7 @@ export default function PortfolioPage() {
               <div key={holding.ticker} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{holding.ticker}</h3>
+                    <h3 className="font-semibold">{formatTicker(holding.ticker)}</h3>
                     <Badge variant="outline">{holding.name}</Badge>
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">

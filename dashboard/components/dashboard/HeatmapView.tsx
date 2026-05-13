@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { getHeatmapColor, formatPercent } from '@/lib/format';
+import { getHeatmapColor, formatPercent, formatTicker } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -78,7 +78,7 @@ export default function HeatmapView({ stocks }: Props) {
             }}
             title={`${item.name}: ${formatPercent(item.value)}`}
           >
-            <div className="text-xs font-700 text-white/95">{item.ticker}</div>
+            <div className="text-xs font-700 text-white/95">{formatTicker(item.ticker)}</div>
             <div className="text-xs font-600 text-white/80 mt-1">{formatPercent(item.value)}</div>
           </div>
         ))}

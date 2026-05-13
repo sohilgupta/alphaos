@@ -50,18 +50,28 @@ function mergeData(
       else if (isInPortfolio) tags.push('PORTFOLIO ONLY');
 
       // If the stored name looks like a ticker code (e.g. "NMDC.NS", "519477.BO",
-      // or a raw number), prefer the live Yahoo Finance longName/shortName instead.
+      // "519477.BO,0P00…", or a raw number), prefer the live Yahoo Finance
+      // longName/shortName instead. Also handles malformed multi-identifier
+      // strings like "519477.BO,0P0000ZAQ.BO" that Yahoo sometimes returns.
       const rawName = wData?.name || pData?.name || null;
-      const isTickerCode = !rawName
-        || rawName === ticker
-        || /^\d+$/.test(rawName)
-        || /^[A-Z0-9&\-]+\.(NS|BO)$/i.test(rawName)
-        || rawName.startsWith('NSE:')
-        || rawName.startsWith('BSE:')
-        || rawName.startsWith('BOM:');
+      const tickerStripped = ticker.replace(/\.(NS|BO)$/i, '');
+      const looksLikeTicker = (n: string | null): boolean => {
+        if (!n) return true;
+        const s = n.trim();
+        if (s === ticker || s === tickerStripped) return true;
+        if (/^\d+(\.\d+)?$/.test(s)) return true;
+        if (/^[A-Z0-9&\-]+\.(NS|BO)$/i.test(s)) return true;
+        if (s.startsWith('NSE:') || s.startsWith('BSE:') || s.startsWith('BOM:')) return true;
+        // Multi-identifier garbage from Yahoo: e.g. "519477.BO,0P0000ZAQ.BO"
+        if (s.includes(',') && /^[A-Z0-9.,\s]+$/i.test(s)) return true;
+        // Yahoo "private" fund identifier
+        if (/^0P[0-9A-Z]{8,}/i.test(s)) return true;
+        return false;
+      };
+      const isTickerCode = looksLikeTicker(rawName);
       const name = isTickerCode
-        ? (live?.longName || live?.shortName || rawName || ticker)
-        : rawName;
+        ? (live?.longName || live?.shortName || rawName || tickerStripped)
+        : (rawName as string);
       const description = wData?.description || '';
       const suggestion = suggestTheme({ name, description });
       const quantity = pData?.quantity;

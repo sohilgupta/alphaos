@@ -1,20 +1,55 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useState, useMemo } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, TrendingDown, BarChart2, Activity, RefreshCw, Map } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import StockTable from '@/components/dashboard/StockTable';
 import HeatmapView from '@/components/dashboard/HeatmapView';
 import CopilotInsights from '@/components/dashboard/CopilotInsights';
-import { formatPercent, formatStockPrice, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/components/providers/AuthProvider';
 
-async function fetchStocks(forceRefresh = false) {
+const STOCKS_CACHE_KEY = 'alphaos.stocks.v1';
+const STOCKS_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24h — show stale cache while we refetch
+
+interface StocksResponse {
+  stocks: MergedStock[];
+  summary?: {
+    totalStocks: number;
+    totalWithLive: number;
+    avgChange: number;
+    topGainer: string | null;
+    topLoser: string | null;
+    lastUpdated: number;
+  };
+}
+
+function readStocksCache(): StocksResponse | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.localStorage.getItem(STOCKS_CACHE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt > STOCKS_CACHE_MAX_AGE) return undefined;
+    return parsed.data;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStocksCache(data: StocksResponse) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STOCKS_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), data }));
+  } catch {} // quota errors swallowed — non-critical
+}
+
+async function fetchStocks(forceRefresh = false): Promise<StocksResponse> {
   const res = await fetch(`/api/stocks${forceRefresh ? '?refresh=true' : ''}`, { next: { revalidate: 0 } });
   if (!res.ok) throw new Error('Failed to fetch');
   return res.json();
@@ -25,13 +60,22 @@ export default function DashboardPage() {
   const { role } = useAuth();
   const isOwner = role === 'owner';
   const [refreshToken, setRefreshToken] = useState(0);
-  const { data, isLoading, isError, isFetching } = useQuery({
+  const { data, isLoading, isError, isFetching } = useQuery<StocksResponse>({
     queryKey: ['stocks', refreshToken],
     queryFn: () => fetchStocks(refreshToken > 0),
-    staleTime: 4 * 60 * 1000,      // reuse cached data for 4 min — no refetch on remount
-    refetchInterval: 5 * 60 * 1000, // background refresh every 5 min
-    refetchOnWindowFocus: false,    // don't refetch just because user switched tabs
+    // First paint: hydrate from localStorage (instant) while we kick off the fetch.
+    initialData: () => readStocksCache(),
+    // While refetching, keep showing the previous data instead of a spinner.
+    placeholderData: keepPreviousData,
+    staleTime: 4 * 60 * 1000,        // 4 min — no refetch on remount within this window
+    refetchInterval: 5 * 60 * 1000,  // background refresh every 5 min
+    refetchOnWindowFocus: false,
   });
+
+  // Persist successful fetches to localStorage so the next session paints instantly.
+  useEffect(() => {
+    if (data?.stocks?.length) writeStocksCache(data);
+  }, [data]);
 
   const [activeTab, setActiveTab] = useState('All');
   const [region, setRegion] = useState<'US' | 'INDIA'>('US');
@@ -192,7 +236,7 @@ export default function DashboardPage() {
           },
           {
             label: 'Top Gainer',
-            value: topGainers[0]?.ticker,
+            value: topGainers[0] ? formatTicker(topGainers[0].ticker) : undefined,
             sub: topGainers[0]?.live ? formatPercent(topGainers[0].live.changePercent) : null,
             icon: TrendingUp,
             isText: true,
@@ -201,7 +245,7 @@ export default function DashboardPage() {
           },
           {
             label: 'Top Loser',
-            value: topLosers[0]?.ticker,
+            value: topLosers[0] ? formatTicker(topLosers[0].ticker) : undefined,
             sub: topLosers[0]?.live ? formatPercent(topLosers[0].live.changePercent) : null,
             icon: TrendingDown,
             isText: true,
@@ -257,7 +301,7 @@ export default function DashboardPage() {
                     className="flex items-center justify-between cursor-pointer hover:bg-white/4 rounded-lg px-2 py-1 -mx-2 transition-colors group"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-700 group-hover:text-primary transition-colors">{s.ticker}</span>
+                      <span className="text-sm font-700 group-hover:text-primary transition-colors">{formatTicker(s.ticker)}</span>
                       <span className="text-xs text-muted-foreground truncate max-w-[100px]">{s.live?.shortName || s.name}</span>
                     </div>
                     <div className="flex items-center gap-2">

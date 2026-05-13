@@ -206,60 +206,53 @@ function computeSummary(history: NsdlMonthPoint[]): NsdlSummary {
   };
 }
 
-// ─── Latest holdings (local file system; not available on Vercel) ─────────────
+// ─── Latest holdings (Google Sheet — works on Vercel) ────────────────────────
+// The NSDL net-worth sheet (1KOE…) is uploaded .xlsx so we can't write to it.
+// Holdings get sync'd to the native India sheet (1ez7…) under `nsdl_holdings`
+// by `python nsdl_cas/scripts/sync_holdings_to_sheet.py`.
+const INDIA_SHEET_ID = '1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM';
+const HOLDINGS_TAB = 'nsdl_holdings';
+
+async function fetchGvizFromSheet(sheetId: string, tab: string): Promise<GoogleTable> {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
+  const res = await fetch(url, { next: { revalidate: 3600 } });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${tab}`);
+  const text = await res.text();
+  const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?\s*$/);
+  if (!m) throw new Error(`Unexpected gviz response for ${tab}`);
+  const parsed = JSON.parse(m[1]);
+  if (parsed.status !== 'ok') throw new Error(parsed.errors?.[0]?.detailed_message || `Failed: ${tab}`);
+  return parsed.table;
+}
+
 async function loadLatestHoldings(): Promise<{
   holdings: NsdlHolding[];
   snapshotDate: string | null;
   snapshotTotal: number | null;
 }> {
-  // Only try this on the server. On Vercel, vault/ won't exist next to the
-  // dashboard/ root directory and we just return empty.
-  if (typeof window !== 'undefined') {
-    return { holdings: [], snapshotDate: null, snapshotTotal: null };
-  }
   try {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    // dashboard/ is the Next.js root; vault/ is a sibling.
-    const dir = path.join(process.cwd(), '..', 'vault', 'nsdl', 'parsed_json');
-    let files: string[];
-    try {
-      files = await fs.readdir(dir);
-    } catch {
-      return { holdings: [], snapshotDate: null, snapshotTotal: null };
+    const table = await fetchGvizFromSheet(INDIA_SHEET_ID, HOLDINGS_TAB);
+    // Columns (from sync script): snapshot_date | asset_name | asset_type | value
+    const holdings: NsdlHolding[] = [];
+    let snapshotDate: string | null = null;
+    for (const row of table.rows) {
+      const date = row.c[0]?.v != null ? cellDate(row.c[0]) || String(row.c[0]?.v) : null;
+      const name = row.c[1]?.v;
+      const type = row.c[2]?.v;
+      const value = cellNum(row.c[3]);
+      if (!name || value == null) continue;
+      holdings.push({
+        name: String(name).trim(),
+        type: (String(type || 'other') as NsdlHoldingType),
+        value,
+      });
+      if (!snapshotDate && date) snapshotDate = date;
     }
-    const jsonFiles = files
-      .filter(f => f.endsWith('.json'))
-      .sort()
-      .reverse();
-    if (jsonFiles.length === 0) {
-      return { holdings: [], snapshotDate: null, snapshotTotal: null };
-    }
-    const latest = jsonFiles[0];
-    const text = await fs.readFile(path.join(dir, latest), 'utf-8');
-    const parsed = JSON.parse(text);
-
-    // parse.py output shape: { statement_date, total_value, holdings: [...] }
-    // Holdings entries: { asset_name, asset_type, value } (post-aggregation)
-    const holdings: NsdlHolding[] = Array.isArray(parsed.holdings)
-      ? parsed.holdings
-          .filter((h: { value?: number; asset_name?: string }) => h && h.asset_name && typeof h.value === 'number')
-          .map((h: { asset_name: string; asset_type?: string; value: number }) => ({
-            name: h.asset_name,
-            type: (h.asset_type || 'other') as NsdlHoldingType,
-            value: h.value,
-          }))
-      : [];
-
     holdings.sort((a, b) => b.value - a.value);
-
-    return {
-      holdings,
-      snapshotDate: parsed.statement_date || null,
-      snapshotTotal: typeof parsed.total_value === 'number' ? parsed.total_value : null,
-    };
+    const snapshotTotal = holdings.reduce((s, h) => s + h.value, 0);
+    return { holdings, snapshotDate, snapshotTotal: holdings.length ? snapshotTotal : null };
   } catch (e) {
-    console.warn('loadLatestHoldings:', e);
+    console.warn('loadLatestHoldings (sheet) failed:', e);
     return { holdings: [], snapshotDate: null, snapshotTotal: null };
   }
 }

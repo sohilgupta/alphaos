@@ -267,8 +267,34 @@ def parse_holdings_from_pages(page_texts: list[str]) -> tuple[list[Holding], lis
     current_block: list[str] = []
 
     combined_text = "\n".join(page_texts)
-    start_match = re.search(r"Holdings\s+as on \d{2}-[A-Za-z]{3}-\d{4}", combined_text, re.IGNORECASE)
-    if not start_match:
+
+    # Locate the start of detailed holdings. Try multiple markers because NSDL
+    # has subtly changed the layout over the years — the canonical "Holdings
+    # as on DD-MMM-YYYY" was missing in the March 2026 statement.
+    start_patterns = [
+        r"Holdings\s+as on \d{2}-[A-Za-z]{3}-\d{4}",                          # canonical
+        r"(?i)Equities\s*\(E\)",                                              # first equity section header
+        r"(?i)Mutual\s+Fund\s+Folios\s*\(F\)",                                # MF section header
+        r"\b(IN[EF0-9][A-Z0-9]{10})\b",                                       # first ISIN as last resort
+    ]
+    start_index: int | None = None
+    for pat in start_patterns:
+        m = re.search(pat, combined_text)
+        if m:
+            start_index = m.start()
+            if pat == start_patterns[0]:
+                break  # Prefer the canonical marker; otherwise try them all
+            # If using a fallback, walk back to a preceding section header so
+            # active_section gets set on the first iteration.
+            section_back = list(re.finditer(
+                r"(?i)(Equities|Mutual Fund Folios|Mutual Funds|Corporate Bonds|Government Securities|Alternate Investment Fund)\s*\([A-Z]\)",
+                combined_text[:start_index]
+            ))
+            if section_back:
+                start_index = section_back[-1].start()
+            break
+
+    if start_index is None:
         warnings.append("Holdings section marker not found in CAS text.")
         return [], warnings
 
@@ -281,11 +307,11 @@ def parse_holdings_from_pages(page_texts: list[str]) -> tuple[list[Holding], lis
 
     end_index = len(combined_text)
     for pattern in end_markers:
-        end_match = re.search(pattern, combined_text[start_match.end():], re.IGNORECASE)
+        end_match = re.search(pattern, combined_text[start_index:], re.IGNORECASE)
         if end_match:
-            end_index = min(end_index, start_match.end() + end_match.start())
+            end_index = min(end_index, start_index + end_match.start())
 
-    holdings_text = combined_text[start_match.start():end_index]
+    holdings_text = combined_text[start_index:end_index]
 
     def flush_block() -> None:
         nonlocal current_block

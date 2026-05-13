@@ -1,6 +1,16 @@
 // lib/format.ts
 // Formatting utilities
 
+/**
+ * Strip exchange suffixes from a ticker for display. The underlying ticker
+ * (`stock.ticker`) is preserved everywhere internally — only what the user
+ * sees is shortened. `RELIANCE.NS` → `RELIANCE`, `500570.BO` → `500570`.
+ */
+export function formatTicker(ticker: string | null | undefined): string {
+  if (!ticker) return '';
+  return ticker.replace(/\.(NS|BO|NSE|BSE)$/i, '');
+}
+
 export function formatPrice(price: number | null | undefined, currency = 'USD'): string {
   if (price == null) return '—';
   return new Intl.NumberFormat('en-US', {
