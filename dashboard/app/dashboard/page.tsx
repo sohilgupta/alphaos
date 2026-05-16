@@ -15,7 +15,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 const STOCKS_CACHE_KEY = 'alphaos.stocks.v1';
-const STOCKS_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24h — show stale cache while we refetch
+// Keep localStorage cache short — if the network fetch fails on mobile we don't
+// want to keep showing day-old data with no indication. 1h covers a tab reopen
+// during the same session; anything older forces a real fetch.
+const STOCKS_CACHE_MAX_AGE = 60 * 60 * 1000; // 1h
 
 interface StocksResponse {
   stocks: MergedStock[];
@@ -50,7 +53,13 @@ function writeStocksCache(data: StocksResponse) {
 }
 
 async function fetchStocks(forceRefresh = false): Promise<StocksResponse> {
-  const res = await fetch(`/api/stocks${forceRefresh ? '?refresh=true' : ''}`, { next: { revalidate: 0 } });
+  // Cache-bust the URL when forcing refresh so mobile browsers can't serve a
+  // stale `/api/stocks?refresh=true` from HTTP cache. `cache: 'no-store'` is
+  // belt-and-suspenders for the same problem.
+  const url = forceRefresh
+    ? `/api/stocks?refresh=true&t=${Date.now()}`
+    : `/api/stocks`;
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to fetch');
   return res.json();
 }

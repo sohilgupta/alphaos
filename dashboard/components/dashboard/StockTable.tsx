@@ -6,7 +6,7 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Search, LayoutGrid, List, ChevronDown,
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor, getReturnHeatClass, type HeatTf } from '@/lib/format';
 import { MergedStock, Verdict, Confidence } from '@/lib/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -99,17 +99,18 @@ function FairValueCell({ stock }: { stock: MergedStock }) {
   );
 }
 
-function ReturnChip({ label, value, active, onClick }: {
-  label: string; value: number | null; active?: boolean; onClick?: () => void;
+function ReturnChip({ label, value, active, onClick, tf }: {
+  label: string; value: number | null; active?: boolean; onClick?: () => void; tf: HeatTf;
 }) {
+  const heat = getReturnHeatClass(value, tf);
   return (
     <button type="button" onClick={onClick}
-      className={`shrink-0 min-w-[3.25rem] rounded-lg border px-2 py-1.5 text-center transition-all
-        ${active ? 'border-primary/40 bg-primary/10' : 'border-white/8 bg-white/[0.03] hover:border-white/16 hover:bg-white/[0.06]'}
+      className={`${heat} shrink-0 min-w-[3.25rem] rounded-md border px-2 py-1.5 text-center transition-all
+        ${active ? 'border-primary/60 ring-1 ring-primary/40' : 'border-transparent hover:brightness-110'}
         ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      <div className={`text-[10px] font-600 uppercase ${active ? 'text-primary' : 'text-muted-foreground'}`}>{label}</div>
-      <div className={`mt-0.5 text-xs font-700 tabular-nums ${getChangeColor(value)}`}>{formatPercent(value)}</div>
+      <div className={`text-[10px] font-600 uppercase ${active ? 'text-primary' : 'opacity-70'}`}>{label}</div>
+      <div className="mt-0.5 text-xs font-700 tabular-nums">{formatPercent(value, 1)}</div>
     </button>
   );
 }
@@ -117,9 +118,9 @@ function ReturnChip({ label, value, active, onClick }: {
 function ReturnStrip({ stock, active, onSort }: { stock: MergedStock; active: SortKey; onSort: (tf: Timeframe) => void }) {
   return (
     <div className="overflow-x-auto scrollbar-none">
-      <div className="flex gap-1.5 min-w-max">
+      <div className="flex gap-1 min-w-max">
         {TFS.map(({ label, get }) => (
-          <ReturnChip key={label} label={label} value={get(stock)} active={active === label} onClick={() => onSort(label)} />
+          <ReturnChip key={label} label={label} value={get(stock)} active={active === label} onClick={() => onSort(label)} tf={label as HeatTf} />
         ))}
       </div>
     </div>

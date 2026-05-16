@@ -1,7 +1,7 @@
 // app/layout.tsx
 
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -12,6 +12,13 @@ const inter = Inter({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800'],
   variable: '--font-inter',
+  display: 'swap',
+});
+
+const jbMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-jbmono',
   display: 'swap',
 });
 
@@ -27,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${inter.variable}`}>
+    <html lang="en" className={`dark ${inter.variable} ${jbMono.variable}`}>
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
         <AuthProvider>
           <QueryProvider>

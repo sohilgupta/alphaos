@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { getHeatmapColor, formatPercent, formatTicker } from '@/lib/format';
+import { getReturnHeatClass, formatPercent, formatTicker, type HeatTf } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -13,11 +13,18 @@ export default function HeatmapView({ stocks }: Props) {
   const router = useRouter();
   const [metric, setMetric] = useState<'changePercent' | 'gain1M' | 'gain1Y'>('changePercent');
 
-  const metricLabel = {
+  const metricLabel: Record<typeof metric, string> = {
     changePercent: 'Today',
     gain1M: '1 Month',
     gain1Y: '1 Year',
   };
+
+  const metricTf: Record<typeof metric, HeatTf> = {
+    changePercent: '1D',
+    gain1M: '1M',
+    gain1Y: '1Y',
+  };
+  const tf = metricTf[metric];
 
   const items = useMemo(() =>
     stocks
@@ -53,14 +60,19 @@ export default function HeatmapView({ stocks }: Props) {
             {metricLabel[m]}
           </button>
         ))}
-        {/* Legend */}
-        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="w-3 h-3 rounded-sm" style={{ background: getHeatmapColor(-10) }} />
-          <span>Negative</span>
-          <div className="w-3 h-3 rounded-sm" style={{ background: 'oklch(0.16 0.006 264)' }} />
-          <span>Neutral</span>
-          <div className="w-3 h-3 rounded-sm" style={{ background: getHeatmapColor(10) }} />
-          <span>Positive</span>
+        {/* Legend — mirrors the 4-step heat scale used in StockTable */}
+        <div className="ml-auto flex items-center gap-1 text-[10px] font-600 text-muted-foreground uppercase tracking-wider">
+          <span className="mr-1">Less</span>
+          <div className="heat-dn-4 w-4 h-3 rounded-sm" />
+          <div className="heat-dn-3 w-4 h-3 rounded-sm" />
+          <div className="heat-dn-2 w-4 h-3 rounded-sm" />
+          <div className="heat-dn-1 w-4 h-3 rounded-sm" />
+          <div className="heat-zero w-4 h-3 rounded-sm" />
+          <div className="heat-up-1 w-4 h-3 rounded-sm" />
+          <div className="heat-up-2 w-4 h-3 rounded-sm" />
+          <div className="heat-up-3 w-4 h-3 rounded-sm" />
+          <div className="heat-up-4 w-4 h-3 rounded-sm" />
+          <span className="ml-1">More</span>
         </div>
       </div>
 
@@ -69,17 +81,12 @@ export default function HeatmapView({ stocks }: Props) {
           <div
             key={item.ticker}
             onClick={() => router.push(`/stock/${item.ticker}`)}
-            className="rounded-lg p-2.5 cursor-pointer hover:opacity-90 transition-opacity flex flex-col justify-between"
-            style={{
-              background: getHeatmapColor(item.value),
-              minWidth: '70px',
-              maxWidth: '110px',
-              flex: '1 1 70px',
-            }}
+            className={`${getReturnHeatClass(item.value, tf)} rounded-lg p-2.5 cursor-pointer hover:brightness-110 transition flex flex-col justify-between`}
+            style={{ minWidth: '70px', maxWidth: '110px', flex: '1 1 70px' }}
             title={`${item.name}: ${formatPercent(item.value)}`}
           >
-            <div className="text-xs font-700 text-white/95">{formatTicker(item.ticker)}</div>
-            <div className="text-xs font-600 text-white/80 mt-1">{formatPercent(item.value)}</div>
+            <div className="text-xs font-700">{formatTicker(item.ticker)}</div>
+            <div className="text-xs font-600 tabular-nums mt-1 opacity-90">{formatPercent(item.value, 1)}</div>
           </div>
         ))}
       </div>

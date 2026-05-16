@@ -46,12 +46,30 @@ SHEETS = {
     },
     "india": {
         "id": "1ez7O6V_fK-7-s-QSgvZsiw2YJkhyYEi52K1L0rauuFM",
+        # Defaults intentionally left with no valuation columns so accidental
+        # matches on unstructured tabs (e.g. 'Stock Watchlist', 'SGBs') are
+        # inert. All real targets use explicit tab_overrides below.
         "ticker_col_letter": "B",
-        "fv_col":         "F",
-        "verdict_col":    "H",
-        "confidence_col": "I",
-        # Both portfolio tabs live in this spreadsheet
+        "fv_col":         None,
+        "verdict_col":    None,
+        "confidence_col": None,
         "tab_overrides": {
+            # Watchlist 2 & 3 — layout after May 2026 column cleanup:
+            #   A=Stock  B=Stock Code  C=Current Price  D=Fair price
+            #   E=Upside  F=Verdict  G=Confidence  H=1w  I=1m  J=3m …
+            "Stock Watchlist 2": {
+                "ticker_col_letter": "B",
+                "fv_col":         "D",
+                "verdict_col":    "F",
+                "confidence_col": "G",
+            },
+            "Stock Watchlist 3": {
+                "ticker_col_letter": "B",
+                "fv_col":         "D",
+                "verdict_col":    "F",
+                "confidence_col": "G",
+            },
+            # Portfolio tabs live in this same spreadsheet
             "US_portfolio": {
                 "ticker_col_letter": "B",
                 "fv_col":         "L",
@@ -201,6 +219,10 @@ def find_ticker_rows(ws, ticker_col_letter: str) -> dict:
 
 def build_updates_for_tab(ws, cfg: dict, valuations: dict) -> list[dict]:
     """Build a list of update dicts ready for batch_update."""
+    # Skip tabs where no valuation columns are defined (None means inert/unstructured tab)
+    if cfg.get("fv_col") is None and cfg.get("verdict_col") is None and cfg.get("confidence_col") is None:
+        return [], []
+
     ticker_rows = find_ticker_rows(ws, cfg["ticker_col_letter"])
     updates = []
     matched = []
@@ -214,13 +236,13 @@ def build_updates_for_tab(ws, cfg: dict, valuations: dict) -> list[dict]:
         verdict = normalize_verdict(val.get("verdict"))
         conf = normalize_confidence(val.get("confidence"))
 
-        if fv is not None:
+        if fv is not None and cfg.get("fv_col"):
             updates.append({"range": f"{cfg['fv_col']}{row}",
                             "values": [[fv]]})
-        if verdict:
+        if verdict and cfg.get("verdict_col"):
             updates.append({"range": f"{cfg['verdict_col']}{row}",
                             "values": [[verdict]]})
-        if conf:
+        if conf and cfg.get("confidence_col"):
             updates.append({"range": f"{cfg['confidence_col']}{row}",
                             "values": [[conf]]})
         matched.append((ticker, row, fv, verdict, conf))

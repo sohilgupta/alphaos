@@ -103,6 +103,36 @@ export function getHeatmapColor(val: number | null): string {
   }
 }
 
+/**
+ * Return a Tailwind class for a percent-return cell, following tracker.shiri.cc's
+ * 4-step opacity scale. Thresholds widen for longer timeframes so a `+20%` in 1W
+ * is visually as strong as `+150%` in 1Y. Pass `tf` to scale; default = 'mid'.
+ *
+ * Returns one of: heat-up-1..4, heat-dn-1..4, or heat-zero.
+ */
+export type HeatTf = '1D' | '1W' | '1M' | '3M' | '1Y' | '3Y';
+export function getReturnHeatClass(val: number | null | undefined, tf: HeatTf = '1M'): string {
+  if (val == null) return 'heat-zero';
+  // Thresholds for [mild, med, strong] — anything beyond strong is solid.
+  const T: Record<HeatTf, [number, number, number]> = {
+    '1D': [0.5, 2, 5],
+    '1W': [1,   5, 15],
+    '1M': [3,  10, 30],
+    '3M': [5,  20, 60],
+    '1Y': [10, 40, 120],
+    '3Y': [25, 100, 300],
+  };
+  const [t1, t2, t3] = T[tf];
+  const abs = Math.abs(val);
+  if (abs < t1) return 'heat-zero';
+  const side = val > 0 ? 'up' : 'dn';
+  let lvl: 1 | 2 | 3 | 4 = 1;
+  if (abs >= t3 * 2) lvl = 4;
+  else if (abs >= t3) lvl = 3;
+  else if (abs >= t2) lvl = 2;
+  return `heat-${side}-${lvl}`;
+}
+
 export function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 }

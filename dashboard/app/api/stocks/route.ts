@@ -89,7 +89,16 @@ export async function GET(request: NextRequest) {
       lastUpdated: Date.now(),
     };
 
-    return NextResponse.json({ stocks: merged, summary }, { status: 200 });
+    return NextResponse.json({ stocks: merged, summary }, {
+      status: 200,
+      headers: {
+        // Prevent mobile browsers and Vercel edge from serving stale responses.
+        // Live stock data must always be fresh from the origin handler.
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'CDN-Cache-Control': 'no-store',
+        'Vercel-CDN-Cache-Control': 'no-store',
+      },
+    });
   } catch (err) {
     console.error('GET /api/stocks error:', err);
     return NextResponse.json({ error: 'Failed to fetch stocks' }, { status: 500 });
