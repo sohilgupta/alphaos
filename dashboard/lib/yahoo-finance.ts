@@ -15,13 +15,14 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
   const result = new Map<string, LiveQuote>();
   const toFetch: string[] = [];
 
-  for (const t of tickers) {
-    const cached = getCache<LiveQuote>(`quote:${t}`);
-    if (cached) {
-      result.set(t, cached);
-    } else {
-      toFetch.push(t);
-    }
+  // Parallelize cache reads — for ~250 tickers, sequential awaits would add
+  // ~250 * KV-roundtrip latency, killing the cache-hit fast path.
+  const cached = await Promise.all(
+    tickers.map(t => getCache<LiveQuote>(`quote:${t}`).then(v => [t, v] as const))
+  );
+  for (const [t, val] of cached) {
+    if (val) result.set(t, val);
+    else toFetch.push(t);
   }
 
   if (toFetch.length === 0) return result;
@@ -33,6 +34,7 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
       const quotes = await yf.quote(chunk);
       const quotesArr = Array.isArray(quotes) ? quotes : [quotes];
 
+      const writes: Promise<void>[] = [];
       for (const q of quotesArr) {
         if (!q || !q.symbol) continue;
         const live: LiveQuote = {
@@ -54,9 +56,10 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
           industry: null,
           fetchedAt: Date.now(),
         };
-        setCache(`quote:${q.symbol}`, live, QUOTE_TTL);
+        writes.push(setCache(`quote:${q.symbol}`, live, QUOTE_TTL));
         result.set(q.symbol, live);
       }
+      await Promise.all(writes);
     } catch (err) {
       console.error(`Failed to fetch quotes for chunk [${chunk.join(',')}]:`, err);
     }
@@ -70,7 +73,7 @@ export async function getBatchQuotes(tickers: string[]): Promise<Map<string, Liv
 }
 
 export async function getStockDetail(ticker: string): Promise<StockDetail | null> {
-  const cached = getCache<StockDetail>(`detail:${ticker}`);
+  const cached = await getCache<StockDetail>(`detail:${ticker}`);
   if (cached) return cached;
 
   try {
@@ -123,7 +126,7 @@ export async function getStockDetail(ticker: string): Promise<StockDetail | null
       employees: (profile as any)?.fullTimeEmployees ?? null,
     };
 
-    setCache(`detail:${ticker}`, data, DETAIL_TTL);
+    await setCache(`detail:${ticker}`, data, DETAIL_TTL);
     return data;
   } catch (err) {
     console.error(`Failed to fetch detail for ${ticker}:`, err);
@@ -147,7 +150,7 @@ const PERIOD_INTERVAL: Record<HistoryPeriod, '1m' | '5m' | '1h' | '1d' | '1wk' |
 
 export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): Promise<ChartDataPoint[]> {
   const cacheKey = `history:${ticker}:${period}`;
-  const cached = getCache<ChartDataPoint[]>(cacheKey);
+  const cached = await getCache<ChartDataPoint[]>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -187,7 +190,7 @@ export async function getHistory(ticker: string, period: HistoryPeriod = '1y'): 
         .filter((p: ChartDataPoint) => p.close > 0);
     }
 
-    setCache(cacheKey, points, HISTORY_TTL);
+    await setCache(cacheKey, points, HISTORY_TTL);
     return points;
   } catch (err) {
     console.error(`Failed to fetch history for ${ticker} (${period}):`, err);
@@ -245,13 +248,13 @@ export async function getBatchHistoricalReturns(
   const result = new Map<string, BatchHistoricalReturns>();
   const toFetch: string[] = [];
 
-  for (const ticker of tickers) {
-    const cached = getCache<BatchHistoricalReturns>(`returns:${ticker}`);
-    if (cached) {
-      result.set(ticker, cached);
-    } else {
-      toFetch.push(ticker);
-    }
+  // Parallelize cache reads (see getBatchQuotes for rationale).
+  const cachedReads = await Promise.all(
+    tickers.map(t => getCache<BatchHistoricalReturns>(`returns:${t}`).then(v => [t, v] as const))
+  );
+  for (const [ticker, val] of cachedReads) {
+    if (val) result.set(ticker, val);
+    else toFetch.push(ticker);
   }
 
   const CONCURRENCY = 4;
@@ -281,7 +284,7 @@ export async function getBatchHistoricalReturns(
           gain1Y: calc(history[0] ?? null),
         };
 
-        setCache(`returns:${ticker}`, returns, HISTORY_TTL);
+        await setCache(`returns:${ticker}`, returns, HISTORY_TTL);
         result.set(ticker, returns);
       } catch (err) {
         console.error(`getBatchHistoricalReturns failed for ${ticker}:`, err);

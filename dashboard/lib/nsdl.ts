@@ -260,7 +260,7 @@ async function loadLatestHoldings(): Promise<{
 // ─── Public entry ──────────────────────────────────────────────────────────────
 export async function getNsdlData(forceRefresh = false): Promise<NsdlData> {
   if (!forceRefresh) {
-    const cached = getCache<NsdlData>('nsdl-data');
+    const cached = await getCache<NsdlData>('nsdl-data');
     if (cached) return cached;
   }
 
@@ -280,6 +280,6 @@ export async function getNsdlData(forceRefresh = false): Promise<NsdlData> {
     latestSnapshotTotal: latest.snapshotTotal,
     generatedAt: Date.now(),
   };
-  setCache('nsdl-data', data, CACHE_TTL);
+  await setCache('nsdl-data', data, CACHE_TTL);
   return data;
 }

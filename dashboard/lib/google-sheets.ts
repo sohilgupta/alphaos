@@ -129,7 +129,7 @@ function parseTabCsv(csvText: string, tabName: string): SheetStock[] {
 
 export async function fetchAllSheetStocks(forceRefresh = false): Promise<SheetStock[]> {
   if (!forceRefresh) {
-    const cached = getCache<SheetStock[]>('us-watchlist');
+    const cached = await getCache<SheetStock[]>('us-watchlist');
     if (cached) return cached;
   }
 
@@ -155,7 +155,7 @@ export async function fetchAllSheetStocks(forceRefresh = false): Promise<SheetSt
     return true;
   });
 
-  setCache('us-watchlist', deduped, WATCHLIST_TTL);
+  await setCache('us-watchlist', deduped, WATCHLIST_TTL);
   return deduped;
 }
 
@@ -172,7 +172,7 @@ const PORTFOLIO_GID = '1252642298';
 
 export async function fetchPortfolioStocks(forceRefresh = false): Promise<import('./types').PortfolioStock[]> {
   if (!forceRefresh) {
-    const cached = getCache<import('./types').PortfolioStock[]>('us-portfolio');
+    const cached = await getCache<import('./types').PortfolioStock[]>('us-portfolio');
     if (cached) return cached;
   }
 
@@ -231,6 +231,6 @@ export async function fetchPortfolioStocks(forceRefresh = false): Promise<import
     console.error('Failed to fetch portfolio:', e);
   }
 
-  setCache('us-portfolio', stocks, WATCHLIST_TTL);
+  await setCache('us-portfolio', stocks, WATCHLIST_TTL);
   return stocks;
 }

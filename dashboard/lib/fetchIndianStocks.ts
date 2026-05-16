@@ -94,7 +94,7 @@ function categoryFromFirstHeader(header: string, fallback: string) {
 
 export async function getIndianPortfolio(forceRefresh = false): Promise<PortfolioStock[]> {
   if (!forceRefresh) {
-    const cached = getCache<PortfolioStock[]>('india-portfolio');
+    const cached = await getCache<PortfolioStock[]>('india-portfolio');
     if (cached) return cached;
   }
 
@@ -148,13 +148,13 @@ export async function getIndianPortfolio(forceRefresh = false): Promise<Portfoli
     console.error('Failed to fetch Indian portfolio:', error);
   }
 
-  setCache('india-portfolio', stocks, CACHE_TTL);
+  await setCache('india-portfolio', stocks, CACHE_TTL);
   return stocks;
 }
 
 export async function getIndianWatchlist(forceRefresh = false): Promise<SheetStock[]> {
   if (!forceRefresh) {
-    const cached = getCache<SheetStock[]>('india-watchlist');
+    const cached = await getCache<SheetStock[]>('india-watchlist');
     if (cached) return cached;
   }
 
@@ -213,6 +213,6 @@ export async function getIndianWatchlist(forceRefresh = false): Promise<SheetSto
     return true;
   });
 
-  setCache('india-watchlist', deduped, CACHE_TTL);
+  await setCache('india-watchlist', deduped, CACHE_TTL);
   return deduped;
 }

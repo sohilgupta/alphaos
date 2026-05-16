@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const forceRefresh = new URL(request.url).searchParams.get('refresh') === 'true';
 
   if (!forceRefresh) {
-    const cached = getCache(CACHE_KEY);
+    const cached = await getCache(CACHE_KEY);
     if (cached) return NextResponse.json(cached);
   }
 
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     });
 
     const payload = { holdings: holdingsWithLive, source };
-    setCache(CACHE_KEY, payload, CACHE_TTL);
+    await setCache(CACHE_KEY, payload, CACHE_TTL);
     return NextResponse.json(payload, { status: 200 });
   } catch (error) {
     console.error('GET /api/portfolio/india error:', error);

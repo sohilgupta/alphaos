@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const forceRefresh = new URL(request.url).searchParams.get('refresh') === 'true';
 
   if (!forceRefresh) {
-    const cached = getCache(CACHE_KEY);
+    const cached = await getCache(CACHE_KEY);
     if (cached) return NextResponse.json(cached);
   }
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const totalValue = (data ?? []).reduce((s, r) => s + (r.value ?? 0), 0);
     const payload = { funds: data ?? [], totalValue, count: (data ?? []).length };
 
-    setCache(CACHE_KEY, payload, CACHE_TTL);
+    await setCache(CACHE_KEY, payload, CACHE_TTL);
     return NextResponse.json(payload);
   } catch (err) {
     console.error('GET /api/mutual-funds error:', err);
