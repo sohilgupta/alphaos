@@ -188,7 +188,9 @@ async function extractPdfText(fileBuffer: Buffer, password: string): Promise<str
     data: new Uint8Array(fileBuffer),
     ...(password ? { password } : {}),
     useWorkerFetch: false,
-    isEvalSupported: false,
+    // isEvalSupported removed in newer pdfjs-dist — eval is disallowed by
+    // default in Node environments, so the previous explicit `false` is no
+    // longer needed (and the property is no longer accepted).
     useSystemFonts: true,
   });
 

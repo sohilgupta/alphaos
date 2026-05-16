@@ -11,7 +11,10 @@ const nextConfig: NextConfig = {
   turbopack: {},
   // Keep these packages un-bundled so their internal file paths
   // (pdfjs worker, canvas bindings) remain valid at runtime on Vercel.
-  serverExternalPackages: ['yahoo-finance2', 'pdf-parse', 'pdfjs-dist'],
+  // pdf-parse was removed: it's not imported anywhere, and v2.x has
+  // `type: module` which makes Vercel's serverless bundler choke when
+  // listed here ("require() resolves to a EcmaScript module").
+  serverExternalPackages: ['yahoo-finance2', 'pdfjs-dist'],
 
   // Disable Vercel edge caching on app HTML responses.
   //
