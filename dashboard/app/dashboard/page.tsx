@@ -232,7 +232,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <div className="flex bg-secondary/50 p-1 rounded-lg border border-white/8 overflow-x-auto w-full sm:w-auto">
+          <div className="flex bg-secondary/50 p-1 rounded-lg border border-foreground/8 overflow-x-auto w-full sm:w-auto">
             {[
               { id: 'US', label: '🇺🇸 US Stocks' },
               { id: 'INDIA', label: '🇮🇳 Indian Stocks' },
@@ -250,7 +250,7 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <div className="flex bg-secondary/50 p-1 rounded-lg border border-white/8 overflow-x-auto w-full sm:w-auto">
+          <div className="flex bg-secondary/50 p-1 rounded-lg border border-foreground/8 overflow-x-auto w-full sm:w-auto">
             {[
               { id: 'ALL', label: 'All', icon: '' },
               { id: 'WATCHLIST', label: 'Watchlist', icon: '' },
@@ -271,7 +271,7 @@ export default function DashboardPage() {
           <button
             onClick={() => setRefreshToken(Date.now())}
             disabled={isFetching}
-            className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 border border-white/8 transition-all"
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/5 border border-foreground/8 transition-all"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
             {isFetching ? 'Refreshing…' : 'Refresh'}
@@ -363,7 +363,7 @@ export default function DashboardPage() {
                   <div
                     key={s.ticker}
                     onClick={() => router.push(`/stock/${s.ticker}`)}
-                    className="flex items-center justify-between cursor-pointer hover:bg-white/4 rounded-lg px-2 py-1 -mx-2 transition-colors group"
+                    className="flex items-center justify-between cursor-pointer hover:bg-foreground/4 rounded-lg px-2 py-1 -mx-2 transition-colors group"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-700 group-hover:text-primary transition-colors">{formatTicker(s.ticker)}</span>
@@ -385,7 +385,7 @@ export default function DashboardPage() {
 
       {/* View toggle */}
       <div className="hidden items-center gap-3 md:flex">
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-white/8">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-foreground/8">
           <button
             onClick={() => setView('table')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-500 transition-colors ${view === 'table' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                   setActiveTab('All');
                   setViewFilter('ALL');
                 }}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-700 transition-colors ${region === option.id ? 'border-primary/30 bg-primary/20 text-primary' : 'border-white/8 bg-secondary/40 text-muted-foreground'}`}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-700 transition-colors ${region === option.id ? 'border-primary/30 bg-primary/20 text-primary' : 'border-foreground/8 bg-secondary/40 text-muted-foreground'}`}
               >
                 {option.label}
               </button>
@@ -431,13 +431,13 @@ export default function DashboardPage() {
                   setViewFilter(option.id as 'WATCHLIST' | 'PORTFOLIO');
                   setActiveTab('All');
                 }}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-700 transition-colors ${viewFilter === option.id ? 'border-primary/30 bg-primary/20 text-primary' : 'border-white/8 bg-secondary/40 text-muted-foreground'}`}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-700 transition-colors ${viewFilter === option.id ? 'border-primary/30 bg-primary/20 text-primary' : 'border-foreground/8 bg-secondary/40 text-muted-foreground'}`}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <TabsList className="bg-secondary/50 border border-white/8 h-auto p-1 gap-0.5 w-max">
+          <TabsList className="bg-secondary/50 border border-foreground/8 h-auto p-1 gap-0.5 w-max">
             {tabs.map(tab => (
               <TabsTrigger
                 key={tab}

@@ -76,7 +76,7 @@ function ConfidenceMeter({ confidence }: { confidence: Confidence | null }) {
   const col = confidence === 'High' ? 'bg-emerald-400' : confidence === 'Medium' ? 'bg-yellow-400' : 'bg-red-400';
   return (
     <div className="flex items-center gap-1.5">
-      <div className="w-14 h-1.5 rounded-full bg-white/10 overflow-hidden shrink-0">
+      <div className="w-14 h-1.5 rounded-full bg-foreground/10 overflow-hidden shrink-0">
         <div className={`h-full rounded-full ${w} ${col}`} />
       </div>
       <span className="text-[10px] text-muted-foreground">{confidence}</span>
@@ -372,7 +372,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
             placeholder="Search ticker, name, category…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-secondary/50 border-white/8 text-sm focus-visible:ring-primary/40"
+            className="pl-9 bg-secondary/50 border-foreground/8 text-sm focus-visible:ring-primary/40"
           />
         </div>
 
@@ -384,7 +384,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
             return (
               <button key={label} onClick={() => handleSort(label)}
                 className={`shrink-0 flex items-center gap-0.5 px-2.5 py-1.5 rounded-md text-xs font-600 border transition-colors
-                  ${active ? 'bg-primary/15 text-primary border-primary/30' : 'bg-secondary/40 text-muted-foreground border-white/8 hover:text-foreground hover:bg-secondary/60'}`}
+                  ${active ? 'bg-primary/15 text-primary border-primary/30' : 'bg-secondary/40 text-muted-foreground border-foreground/8 hover:text-foreground hover:bg-secondary/60'}`}
               >
                 {label}
                 {active && (sortDir === 'desc' ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
@@ -393,7 +393,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
           })}
         </div>
 
-        <div className="hidden items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-white/8 md:flex">
+        <div className="hidden items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-foreground/8 md:flex">
           <button onClick={() => setView('table')}
             className={`p-1.5 rounded-md transition-colors ${view === 'table' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
           ><List className="w-4 h-4" /></button>
@@ -412,23 +412,23 @@ export default function StockTable({ stocks, isLoading }: Props) {
           return (
             <button key={label} onClick={() => setQuickFilter(isActive ? null : qf)}
               className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-600 border transition-all
-                ${isActive ? 'bg-primary/20 text-primary border-primary/40' : 'bg-white/5 text-muted-foreground border-white/10 hover:border-white/20 hover:text-foreground'}`}
+                ${isActive ? 'bg-primary/20 text-primary border-primary/40' : 'bg-foreground/5 text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground'}`}
             >{label}</button>
           );
         })}
 
-        <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+        <div className="w-px h-4 bg-foreground/10 mx-1 shrink-0" />
         <span className="shrink-0 text-xs text-muted-foreground/50">Best:</span>
 
         {TFS.map(({ label }) => {
           const topAct = quickFilter?.kind === 'timeframe' && quickFilter.dir === 'top'    && quickFilter.tf === label;
           const botAct = quickFilter?.kind === 'timeframe' && quickFilter.dir === 'bottom' && quickFilter.tf === label;
           return (
-            <div key={label} className="flex shrink-0 rounded-md overflow-hidden border border-white/8">
+            <div key={label} className="flex shrink-0 rounded-md overflow-hidden border border-foreground/8">
               <button onClick={() => setQuickFilter(topAct ? null : { kind: 'timeframe', dir: 'top',    tf: label })}
                 className={`px-2 py-1 text-xs font-600 transition-colors ${topAct ? 'bg-emerald-500/20 text-emerald-400' : 'bg-secondary/40 text-muted-foreground hover:text-emerald-400'}`}
               >↑{label}</button>
-              <div className="w-px bg-white/8" />
+              <div className="w-px bg-foreground/8" />
               <button onClick={() => setQuickFilter(botAct ? null : { kind: 'timeframe', dir: 'bottom', tf: label })}
                 className={`px-2 py-1 text-xs font-600 transition-colors ${botAct ? 'bg-red-500/20 text-red-400' : 'bg-secondary/40 text-muted-foreground hover:text-red-400'}`}
               >↓{label}</button>
@@ -438,7 +438,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
 
         {quickFilter && (
           <button onClick={() => setQuickFilter(null)}
-            className="shrink-0 px-2 py-1 rounded-full text-xs font-600 text-muted-foreground border border-white/8 bg-secondary/40 hover:text-foreground transition-colors"
+            className="shrink-0 px-2 py-1 rounded-full text-xs font-600 text-muted-foreground border border-foreground/8 bg-secondary/40 hover:text-foreground transition-colors"
           >✕ Reset</button>
         )}
       </div>
@@ -456,7 +456,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
           </div>
           {quickFilter && (
             <button onClick={() => setQuickFilter(null)}
-              className="mt-4 px-3 py-1.5 rounded-md text-xs font-600 border border-white/10 bg-white/5 text-foreground hover:bg-white/10 transition-colors"
+              className="mt-4 px-3 py-1.5 rounded-md text-xs font-600 border border-foreground/10 bg-foreground/5 text-foreground hover:bg-foreground/10 transition-colors"
             >Clear filter</button>
           )}
         </div>
@@ -490,7 +490,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
                 </div>
               )}
               <ConfidenceMeter confidence={stock.confidence} />
-              <div className="pt-2 border-t border-white/8">
+              <div className="pt-2 border-t border-foreground/8">
                 <ReturnStrip stock={stock} active={sortKey} onSort={handleSort} />
               </div>
             </div>
@@ -507,7 +507,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block rounded-xl border border-white/8 overflow-hidden">
+          <div className="hidden md:block rounded-xl border border-foreground/8 overflow-hidden">
             <div className="overflow-x-auto w-full scrollbar-thin">
               <table className="w-full min-w-[1120px] text-sm">
                 <thead className="sticky top-0 z-10 bg-card">
@@ -534,7 +534,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
                           return (
                             <button key={label} onClick={() => handleSort(label)}
                               className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-700 uppercase tracking-wider border transition-colors
-                                ${active ? 'bg-primary/15 text-primary border-primary/30' : 'text-muted-foreground border-white/8 hover:text-foreground hover:border-white/20'}`}
+                                ${active ? 'bg-primary/15 text-primary border-primary/30' : 'text-muted-foreground border-foreground/8 hover:text-foreground hover:border-foreground/20'}`}
                             >
                               {label}
                               {active && (sortDir === 'desc' ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />)}
