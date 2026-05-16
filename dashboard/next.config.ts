@@ -12,6 +12,29 @@ const nextConfig: NextConfig = {
   // Keep these packages un-bundled so their internal file paths
   // (pdfjs worker, canvas bindings) remain valid at runtime on Vercel.
   serverExternalPackages: ['yahoo-finance2', 'pdf-parse', 'pdfjs-dist'],
+
+  // Disable Vercel edge caching on app HTML responses.
+  //
+  // The default Vercel CDN cheerfully caches HTML responses for hours
+  // unless told otherwise. When we push new CSS chunks, the cached HTML
+  // keeps pointing at the *old* chunk URLs, so users see stale styling
+  // (dark cards in light mode, missing theme variables, etc.) until the
+  // edge cache eventually expires. This kills that behavior for HTML.
+  // Hashed _next/static/* assets are exempted via the source pattern and
+  // keep their long-lived cache headers because their URL changes with
+  // content.
+  async headers() {
+    return [
+      {
+        source: '/:path((?!_next/static|favicon|.*\\..*).*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+          { key: 'CDN-Cache-Control', value: 'no-store' },
+          { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
