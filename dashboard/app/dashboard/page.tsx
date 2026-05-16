@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import StockTable from '@/components/dashboard/StockTable';
 import HeatmapView from '@/components/dashboard/HeatmapView';
 import CopilotInsights from '@/components/dashboard/CopilotInsights';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
@@ -32,14 +33,14 @@ interface StocksResponse {
   };
 }
 
-function readStocksCache(): StocksResponse | undefined {
+function readStocksCache(): { data: StocksResponse; cachedAt: number } | undefined {
   if (typeof window === 'undefined') return undefined;
   try {
     const raw = window.localStorage.getItem(STOCKS_CACHE_KEY);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw);
     if (!parsed?.cachedAt || Date.now() - parsed.cachedAt > STOCKS_CACHE_MAX_AGE) return undefined;
-    return parsed.data;
+    return { data: parsed.data, cachedAt: parsed.cachedAt };
   } catch {
     return undefined;
   }
@@ -73,7 +74,12 @@ export default function DashboardPage() {
     queryKey: ['stocks', refreshToken],
     queryFn: () => fetchStocks(refreshToken > 0),
     // First paint: hydrate from localStorage (instant) while we kick off the fetch.
-    initialData: () => readStocksCache(),
+    // CRITICAL: `initialDataUpdatedAt` MUST be set to the cache's real age — otherwise
+    // React Query assumes the initial data was just-fetched and silently skips the
+    // background refetch until staleTime expires. Without this, refresh button
+    // appears to do nothing and prices look stuck.
+    initialData: () => readStocksCache()?.data,
+    initialDataUpdatedAt: () => readStocksCache()?.cachedAt,
     // While refetching, keep showing the previous data instead of a spinner.
     placeholderData: keepPreviousData,
     staleTime: 4 * 60 * 1000,        // 4 min — no refetch on remount within this window
@@ -157,14 +163,17 @@ export default function DashboardPage() {
               {isLoading ? 'Loading…' : `${filtered.length} ${region === 'US' ? 'US' : 'Indian'} stocks`}
             </p>
           </div>
-          <button
-            onClick={() => setRefreshToken(Date.now())}
-            disabled={isFetching}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-secondary/50 text-muted-foreground"
-            aria-label="Refresh stocks"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setRefreshToken(Date.now())}
+              disabled={isFetching}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
+              aria-label="Refresh stocks"
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -224,6 +233,7 @@ export default function DashboardPage() {
           {isOwner && !isLoading && stocks.length > 0 && (
             <CopilotInsights stocks={stocks} region={region} />
           )}
+          <ThemeToggle />
         </div>
       </div>
 

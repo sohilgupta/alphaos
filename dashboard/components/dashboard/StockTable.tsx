@@ -103,13 +103,19 @@ function ReturnChip({ label, value, active, onClick, tf }: {
   label: string; value: number | null; active?: boolean; onClick?: () => void; tf: HeatTf;
 }) {
   const heat = getReturnHeatClass(value, tf);
+  // On solid green/red tiles (heat-*-3 / heat-*-4) the label inherits white text
+  // from the parent class, so the "active" state can't tint it primary — that
+  // would make the label invisible. Instead, show active via a ring + bold.
+  const onSolidTile = heat === 'heat-up-3' || heat === 'heat-up-4' || heat === 'heat-dn-3' || heat === 'heat-dn-4';
   return (
     <button type="button" onClick={onClick}
       className={`${heat} shrink-0 min-w-[3.25rem] rounded-md border px-2 py-1.5 text-center transition-all
-        ${active ? 'border-primary/60 ring-1 ring-primary/40' : 'border-transparent hover:brightness-110'}
+        ${active ? 'ring-2 ring-primary/70 border-transparent' : 'border-transparent hover:brightness-110'}
         ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      <div className={`text-[10px] font-600 uppercase ${active ? 'text-primary' : 'opacity-70'}`}>{label}</div>
+      <div className={`text-[10px] font-700 uppercase tracking-wide ${
+        active && !onSolidTile ? 'text-primary' : onSolidTile ? 'text-white/95' : 'opacity-80'
+      }`}>{label}</div>
       <div className="mt-0.5 text-xs font-700 tabular-nums">{formatPercent(value, 1)}</div>
     </button>
   );
@@ -504,7 +510,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
           <div className="hidden md:block rounded-xl border border-white/8 overflow-hidden">
             <div className="overflow-x-auto w-full scrollbar-thin">
               <table className="w-full min-w-[1120px] text-sm">
-                <thead className="sticky top-0 z-10" style={{ background: 'oklch(0.10 0.006 264)' }}>
+                <thead className="sticky top-0 z-10 bg-card">
                   <tr>
                     <th className="px-3 py-3 text-left text-xs font-600 text-muted-foreground uppercase tracking-wider">Tag</th>
                     {colHead('ticker', 'Ticker')}

@@ -57,8 +57,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-56 flex-col md:flex"
-        style={{ background: 'oklch(0.09 0.006 264)', borderRight: '1px solid oklch(1 0 0 / 8%)' }}>
+      <aside className="fixed left-0 top-0 z-40 hidden h-full w-56 flex-col bg-sidebar border-r border-sidebar-border md:flex">
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-5 py-5 border-b border-white/8">
           <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center shadow-lg shadow-indigo-500/20">

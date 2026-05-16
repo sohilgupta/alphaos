@@ -34,7 +34,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${jbMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jbMono.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Set theme BEFORE paint to avoid a flash. Reads localStorage 'theme'
+            ('light'|'dark'), falls back to prefers-color-scheme, defaults to dark. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('alphaos.theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');}}catch(e){document.documentElement.classList.add('dark');}})();`,
+          }}
+        />
+      </head>
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
         <AuthProvider>
           <QueryProvider>
