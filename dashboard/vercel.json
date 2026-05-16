@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "// crons-note": "Vercel Hobby caps crons at once-per-day; */5 fails deploy. This runs daily at 13:00 UTC — covers Indian market close (~10:00 UTC) and US pre-market open (~13:30 UTC) in one shot. For real per-minute warming, point an external cron-job.org task at /api/cron/warm (free, 1-min granularity) and pass Authorization: Bearer $CRON_SECRET. OR upgrade to Vercel Pro and change this to */5 * * * *.",
   "crons": [
     {
       "path": "/api/cron/warm",
