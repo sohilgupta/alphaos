@@ -136,3 +136,40 @@ export function getReturnHeatClass(val: number | null | undefined, tf: HeatTf = 
 export function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 }
+
+/**
+ * Returns true if `name` looks like a Yahoo/Google placeholder rather than a
+ * real company name. Examples that are garbage:
+ *   "519477.BO,0P0000XXXX"     — comma-joined symbol list
+ *   "0P0000ABCD"               — Yahoo mutual fund internal ID
+ *   "532325.BO"                — bare exchange-suffixed code (no human name)
+ * A real name is something like "Tata Motors" or "Bloom Energy Corp".
+ */
+export function isPlaceholderName(name: string | null | undefined): boolean {
+  if (!name) return true;
+  const s = name.trim();
+  if (!s) return true;
+  if (s.includes(',')) return true;                  // comma = symbol list
+  if (/^0P[0-9A-Z]{8,}$/.test(s)) return true;       // Yahoo fund code
+  if (/^\d+(\.[A-Z]{2,3})?$/.test(s)) return true;   // bare BSE/NSE code
+  // No letters at all — likely numeric noise
+  if (!/[a-zA-Z]{2,}/.test(s)) return true;
+  return false;
+}
+
+/**
+ * Pick the best display name from sheet data + Yahoo live data. Prefers the
+ * sheet name if it looks real, otherwise falls back to Yahoo's shortName,
+ * otherwise the cleaned ticker.
+ */
+export function displayName(opts: {
+  sheetName?: string | null;
+  liveShortName?: string | null;
+  liveLongName?: string | null;
+  ticker: string;
+}): string {
+  if (!isPlaceholderName(opts.sheetName)) return opts.sheetName!.trim();
+  if (!isPlaceholderName(opts.liveShortName)) return opts.liveShortName!.trim();
+  if (!isPlaceholderName(opts.liveLongName)) return opts.liveLongName!.trim();
+  return formatTicker(opts.ticker);
+}

@@ -1,9 +1,14 @@
 'use client';
 
+// Despite the filename, this component now renders as a horizontal top nav
+// on desktop (no more left sidebar) and a bottom tab bar on mobile. The
+// file name stays for backwards-compatibility with imports — feel free to
+// rename to AppNav later if you want.
+
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, ChevronRight, Shield, LockOpen, Wallet } from 'lucide-react';
+import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, Shield, LockOpen, Wallet } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -57,74 +62,72 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-56 flex-col bg-sidebar border-r border-sidebar-border md:flex">
+      {/* Desktop top nav — horizontal bar, ~56px tall. Replaces the old 224px
+          left sidebar so the watchlist table gets the full viewport width. */}
+      <header className="hidden md:flex sticky top-0 z-40 h-14 items-center gap-4 border-b border-border bg-sidebar/95 backdrop-blur px-5">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-white/8">
-          <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity">
+          <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center shadow-sm">
             <Activity className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <div className="text-sm font-700 text-foreground leading-none">AlphaOS</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Dashboard</div>
-          </div>
-        </div>
+          <div className="text-sm font-700 text-foreground leading-none">AlphaOS</div>
+        </Link>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        {/* Primary nav */}
+        <nav className="flex items-center gap-1">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/');
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-500 transition-all duration-150 group ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-600 transition-colors ${
                   isActive
                     ? 'bg-primary/15 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/4'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
                 }`}
               >
-                <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                <Icon className="w-3.5 h-3.5" />
                 {label}
-                {isActive && <ChevronRight className="w-3 h-3 ml-auto text-primary/60" />}
               </Link>
             );
           })}
         </nav>
 
-        {/* Actions */}
-        <div className="p-3 border-t border-white/8 space-y-1">
+        {/* Right actions */}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title={`Last updated ${lastUpdated}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-primary' : ''}`} />
+            <span className="hidden lg:inline">Refresh</span>
+          </button>
+
           {role === 'owner' ? (
             <button
               onClick={logout}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-primary hover:bg-white/4 transition-all font-600"
+              title="Lock portfolio"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-primary hover:bg-foreground/5 transition-all font-600"
             >
               <LockOpen className="w-3.5 h-3.5" />
-              <span className="flex-1 text-left">Lock Portfolio</span>
+              <span className="hidden lg:inline">Lock</span>
             </button>
           ) : (
             <Link
               href="/login"
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-white/4 transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all"
             >
               <Shield className="w-3.5 h-3.5" />
-              <span className="flex-1 text-left">Owner Login</span>
+              <span className="hidden lg:inline">Owner Login</span>
             </Link>
           )}
-
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-white/4 transition-all"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-primary' : ''}`} />
-            <span className="flex-1 text-left">Refresh Data</span>
-          </button>
-          <div className="px-3 mt-1 text-xs text-muted-foreground/60">
-            Updated {lastUpdated}
-          </div>
         </div>
-      </aside>
+      </header>
 
+      {/* Mobile bottom tab bar — unchanged */}
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
           {mobileNavItems.map(({ href, label, icon: Icon }) => {

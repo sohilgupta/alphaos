@@ -81,12 +81,12 @@ export default function HeatmapView({ stocks }: Props) {
           <div
             key={item.ticker}
             onClick={() => router.push(`/stock/${item.ticker}`)}
-            className={`${getReturnHeatClass(item.value, tf)} rounded-lg p-2.5 cursor-pointer hover:brightness-110 transition flex flex-col justify-between`}
+            className={`${getReturnHeatClass(item.value, tf)} rounded-lg p-2.5 cursor-pointer hover:brightness-110 transition flex flex-col justify-between overflow-hidden`}
             style={{ minWidth: '70px', maxWidth: '110px', flex: '1 1 70px' }}
             title={`${item.name}: ${formatPercent(item.value)}`}
           >
-            <div className="text-xs font-700">{formatTicker(item.ticker)}</div>
-            <div className="text-xs font-600 tabular-nums mt-1 opacity-90">{formatPercent(item.value, 1)}</div>
+            <div className="text-xs font-700 truncate min-w-0">{formatTicker(item.ticker)}</div>
+            <div className="text-xs font-600 tabular-nums mt-1 opacity-90 truncate">{formatPercent(item.value, 1)}</div>
           </div>
         ))}
       </div>

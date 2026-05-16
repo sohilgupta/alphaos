@@ -9,7 +9,7 @@ import StockTable from '@/components/dashboard/StockTable';
 import HeatmapView from '@/components/dashboard/HeatmapView';
 import CopilotInsights from '@/components/dashboard/CopilotInsights';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor } from '@/lib/format';
+import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor, displayName } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -367,7 +367,7 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-700 group-hover:text-primary transition-colors">{formatTicker(s.ticker)}</span>
-                      <span className="text-xs text-muted-foreground truncate max-w-[100px]">{s.live?.shortName || s.name}</span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[100px]">{displayName({ sheetName: s.name, liveShortName: s.live?.shortName, liveLongName: s.live?.longName, ticker: s.ticker })}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs tabular-nums text-muted-foreground">{formatStockPrice(s.live?.price ?? null, s.region)}</span>

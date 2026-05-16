@@ -50,9 +50,12 @@ export default function RootLayout({
         <AuthProvider>
           <QueryProvider>
             <TooltipProvider>
-              <div className="flex min-h-screen">
+              {/* Sidebar now renders as a sticky top nav on desktop and a
+                  fixed bottom tab bar on mobile — see components/layout/Sidebar.tsx.
+                  The old md:ml-56 offset is gone; main takes full viewport width. */}
+              <div className="flex min-h-screen flex-col">
                 <Sidebar />
-                <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:ml-56 md:pb-0">
+                <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-0">
                   {children}
                 </main>
               </div>
