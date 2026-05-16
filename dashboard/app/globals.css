@@ -91,25 +91,31 @@
 }
 
 .dark {
-  --background: oklch(0.08 0.005 264);
-  --foreground: oklch(0.96 0.005 264);
-  --card: oklch(0.11 0.006 264);
-  --card-foreground: oklch(0.96 0.005 264);
-  --popover: oklch(0.13 0.006 264);
-  --popover-foreground: oklch(0.96 0.005 264);
-  --primary: oklch(0.65 0.22 265);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.16 0.006 264);
-  --secondary-foreground: oklch(0.85 0.005 264);
-  --muted: oklch(0.14 0.006 264);
-  --muted-foreground: oklch(0.55 0.01 264);
-  --accent: oklch(0.65 0.22 265 / 15%);
-  --accent-foreground: oklch(0.75 0.18 265);
+  /* Dark mode keeps the warm parchment accent (amber/bronze, hue 50–65)
+     deliberately — using indigo (hue 265) made the UI shift visibly toward
+     amber on any device with Night Shift / True Tone enabled, which created
+     persistent confusion ("why is dark mode amber?"). Staying in the warm
+     family across both themes also matches tracker.shiri.cc's look and is
+     filter-stable on every display. */
+  --background: oklch(0.10 0.008 60);
+  --foreground: oklch(0.94 0.012 75);
+  --card: oklch(0.13 0.010 60);
+  --card-foreground: oklch(0.94 0.012 75);
+  --popover: oklch(0.15 0.010 60);
+  --popover-foreground: oklch(0.94 0.012 75);
+  --primary: oklch(0.72 0.13 65);
+  --primary-foreground: oklch(0.15 0.01 60);
+  --secondary: oklch(0.16 0.010 60);
+  --secondary-foreground: oklch(0.90 0.012 75);
+  --muted: oklch(0.14 0.010 60);
+  --muted-foreground: oklch(0.60 0.012 65);
+  --accent: oklch(0.72 0.13 65 / 15%);
+  --accent-foreground: oklch(0.80 0.14 65);
   --destructive: oklch(0.65 0.22 27);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.65 0.22 265);
-  --chart-1: oklch(0.65 0.22 265);
+  --ring: oklch(0.72 0.13 65);
+  --chart-1: oklch(0.72 0.13 65);
   --chart-2: oklch(0.72 0.19 168);
   --chart-3: oklch(0.72 0.19 27);
   --chart-4: oklch(0.72 0.19 75);
@@ -122,14 +128,14 @@
   --loss: oklch(0.68 0.22 27);
   --indigo: oklch(0.65 0.22 265);
   --indigo-muted: oklch(0.65 0.22 265 / 20%);
-  --sidebar: oklch(0.10 0.006 264);
-  --sidebar-foreground: oklch(0.85 0.005 264);
-  --sidebar-primary: oklch(0.65 0.22 265);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.65 0.22 265 / 15%);
-  --sidebar-accent-foreground: oklch(0.75 0.18 265);
+  --sidebar: oklch(0.12 0.010 60);
+  --sidebar-foreground: oklch(0.90 0.012 75);
+  --sidebar-primary: oklch(0.72 0.13 65);
+  --sidebar-primary-foreground: oklch(0.15 0.01 60);
+  --sidebar-accent: oklch(0.72 0.13 65 / 15%);
+  --sidebar-accent-foreground: oklch(0.80 0.14 65);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.65 0.22 265);
+  --sidebar-ring: oklch(0.72 0.13 65);
 }
 
 @layer base {
