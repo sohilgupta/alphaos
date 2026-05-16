@@ -143,7 +143,7 @@ function MobileCard({ stock, isOwner, active, onSort, onOpen }: {
   const hasIntel = !!(stock.verdict || stock.confidence || stock.fairPrice || (isOwner && stock.portfolioData));
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-gradient-to-br from-zinc-950/90 to-zinc-900/50 backdrop-blur-md overflow-hidden shadow-lg">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
       <button type="button" onClick={onOpen} className="w-full text-left p-4 active:opacity-80">
         {/* Row 1: Name + Verdict */}
         <div className="flex items-start justify-between gap-3">
@@ -189,13 +189,13 @@ function MobileCard({ stock, isOwner, active, onSort, onOpen }: {
           <button
             type="button"
             onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-center gap-1 py-2 border-t border-white/6 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            className="w-full flex items-center justify-center gap-1 py-2 border-t border-border text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
           >
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {expanded ? 'Less' : 'Intelligence'}
           </button>
           {expanded && (
-            <div className="px-4 pb-4 pt-2 border-t border-white/6 bg-white/[0.02] space-y-2.5">
+            <div className="px-4 pb-4 pt-2 border-t border-border bg-foreground/[0.02] space-y-2.5">
               {stock.verdict && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Signal</span>
@@ -444,7 +444,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
       </div>
 
       {sorted.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] py-12 px-6 text-center">
+        <div className="rounded-2xl border border-dashed border-border bg-foreground/[0.02] py-12 px-6 text-center">
           <div className="text-sm font-600 text-foreground mb-1">No stocks match this filter</div>
           <div className="text-xs text-muted-foreground max-w-md mx-auto">
             {quickFilter?.kind === 'verdict' && `No stocks tagged "${quickFilter.verdict}" in the current sheet. Add a Verdict column to the Google Sheet to populate this.`}
@@ -484,7 +484,7 @@ export default function StockTable({ stocks, isLoading }: Props) {
                 )}
               </div>
               {(stock.fairPrice || stock.potentialGain != null) && (
-                <div className="flex items-center justify-between text-xs border-t border-white/6 pt-2">
+                <div className="flex items-center justify-between text-xs border-t border-border pt-2">
                   <span className="text-muted-foreground/60">Fair</span>
                   <FairValueCell stock={stock} />
                 </div>

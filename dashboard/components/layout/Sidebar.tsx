@@ -125,7 +125,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
           {mobileNavItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/');
@@ -136,7 +136,7 @@ export default function Sidebar() {
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-600 transition-colors ${active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-white/4'}`}
+                className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-600 transition-colors ${active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'}`}
               >
                 <Icon className={`h-4 w-4 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
                 {label}
