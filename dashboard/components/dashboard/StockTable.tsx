@@ -103,19 +103,21 @@ function ReturnChip({ label, value, active, onClick, tf }: {
   label: string; value: number | null; active?: boolean; onClick?: () => void; tf: HeatTf;
 }) {
   const heat = getReturnHeatClass(value, tf);
-  // On solid green/red tiles (heat-*-3 / heat-*-4) the label inherits white text
-  // from the parent class, so the "active" state can't tint it primary — that
-  // would make the label invisible. Instead, show active via a ring + bold.
   const onSolidTile = heat === 'heat-up-3' || heat === 'heat-up-4' || heat === 'heat-dn-3' || heat === 'heat-dn-4';
+  // Active state uses a 2px foreground-tinted inset border instead of a
+  // `ring` so the chip's outer dimensions stay identical to its inactive
+  // sibling (rings sit OUTSIDE the box). `border-foreground/60` reads as
+  // dark on light tiles and light on solid green/red tiles — no clash
+  // with the amber primary.
   return (
     <button type="button" onClick={onClick}
-      className={`${heat} shrink-0 min-w-[3.25rem] rounded-md border px-2 py-1.5 text-center transition-all
-        ${active ? 'ring-2 ring-primary/70 border-transparent' : 'border-transparent hover:brightness-110'}
+      className={`${heat} shrink-0 min-w-[3.25rem] rounded-md border-2 px-2 py-1.5 text-center transition-all
+        ${active ? (onSolidTile ? 'border-white/80' : 'border-foreground/60') : 'border-transparent hover:brightness-110'}
         ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      <div className={`text-[10px] font-700 uppercase tracking-wide ${
-        active && !onSolidTile ? 'text-primary' : onSolidTile ? 'text-white/95' : 'opacity-80'
-      }`}>{label}</div>
+      <div className={`text-[10px] font-700 uppercase tracking-wide ${onSolidTile ? 'text-white/95' : 'opacity-80'}`}>
+        {label}
+      </div>
       <div className="mt-0.5 text-xs font-700 tabular-nums">{formatPercent(value, 1)}</div>
     </button>
   );

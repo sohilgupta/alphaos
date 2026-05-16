@@ -36,11 +36,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jbMono.variable}`} suppressHydrationWarning>
       <head>
-        {/* Set theme BEFORE paint to avoid a flash. Reads localStorage 'theme'
-            ('light'|'dark'), falls back to prefers-color-scheme, defaults to dark. */}
+        {/* Set theme BEFORE paint to avoid a flash. Light is the default for
+            any new device — the only way to land in dark mode is to explicitly
+            toggle (which persists to localStorage). We ignore prefers-color-scheme
+            so phones with system dark mode don't override our light default. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('alphaos.theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');}}catch(e){document.documentElement.classList.add('dark');}})();`,
+            __html: `(function(){try{if(localStorage.getItem('alphaos.theme')==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`,
           }}
         />
       </head>

@@ -6,14 +6,14 @@ import { Sun, Moon } from 'lucide-react';
 type Theme = 'light' | 'dark';
 
 function readTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   const saved = localStorage.getItem('alphaos.theme');
   if (saved === 'light' || saved === 'dark') return saved;
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
