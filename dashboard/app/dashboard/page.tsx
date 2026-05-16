@@ -65,6 +65,18 @@ async function fetchStocks(forceRefresh = false): Promise<StocksResponse> {
   return res.json();
 }
 
+interface PricesResponse {
+  prices: Record<string, { p: number; c: number; cp: number; t: number }>;
+  count: number;
+  generatedAt: number;
+}
+
+async function fetchPrices(): Promise<PricesResponse> {
+  const res = await fetch(`/api/prices?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to fetch prices');
+  return res.json();
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { role } = useAuth();
@@ -92,6 +104,22 @@ export default function DashboardPage() {
     if (data?.stocks?.length) writeStocksCache(data);
   }, [data]);
 
+  // Live-price refresh loop — /api/prices is a thin endpoint that only returns
+  // ticker → price/change/changePercent. We poll it on a faster cadence than
+  // /api/stocks (which includes the heavier sheet/verdict data) and overlay
+  // the fresh prices on top of the existing stock list. Gated on the initial
+  // /api/stocks load so we don't trigger before any tickers are known to the
+  // server-side cache.
+  const { data: pricesData } = useQuery<PricesResponse>({
+    queryKey: ['prices'],
+    queryFn: fetchPrices,
+    enabled: !!data?.stocks?.length,
+    staleTime: 25 * 1000,
+    refetchInterval: 30 * 1000,        // poll every 30s
+    refetchIntervalInBackground: false, // pause when tab hidden
+    refetchOnWindowFocus: true,        // fresh prices when user returns
+  });
+
   const [activeTab, setActiveTab] = useState('All');
   const [region, setRegion] = useState<'US' | 'INDIA'>('US');
   const [view, setView] = useState<'table' | 'heatmap'>('table');
@@ -105,7 +133,25 @@ export default function DashboardPage() {
     return isOwner ? 'PORTFOLIO' : 'ALL';
   });
 
-  const stocks = useMemo<MergedStock[]>(() => data?.stocks ?? [], [data?.stocks]);
+  // Merge live prices from /api/prices on top of the /api/stocks snapshot.
+  // The merge is a shallow override of the `live` field for tickers that
+  // appear in the prices map; everything else (sheet metadata, verdicts,
+  // portfolio data, returns) stays as-is from /api/stocks.
+  const stocks = useMemo<MergedStock[]>(() => {
+    const base = data?.stocks ?? [];
+    const prices = pricesData?.prices;
+    if (!prices) return base;
+    return base.map(s => {
+      const p = prices[s.ticker];
+      if (!p) return s;
+      return {
+        ...s,
+        live: s.live
+          ? { ...s.live, price: p.p, change: p.c, changePercent: p.cp, fetchedAt: p.t }
+          : null,
+      };
+    });
+  }, [data?.stocks, pricesData?.prices]);
 
   const filteredByRegion = useMemo(() => stocks.filter(s => s.region === region), [stocks, region]);
 
