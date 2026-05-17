@@ -9,6 +9,7 @@ import StockTable from '@/components/dashboard/StockTable';
 import HeatmapView from '@/components/dashboard/HeatmapView';
 import CopilotInsights from '@/components/dashboard/CopilotInsights';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor, displayName } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
@@ -216,7 +217,7 @@ export default function DashboardPage() {
               {viewFilter === 'PORTFOLIO' ? 'Portfolio' : 'Watchlist'}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {isLoading ? 'Loading…' : `${filtered.length} ${region === 'US' ? 'US' : 'Indian'} stocks`}
+              {isLoading ? <LoadingIndicator /> : `${filtered.length} ${region === 'US' ? 'US' : 'Indian'} stocks`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -238,7 +239,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-800 text-foreground tracking-tight">AlphaOS Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? 'Loading…' : `${filteredByView.length} ${region === 'US' ? 'US' : 'Indian'} stocks across ${tabs.length - 1} categories`}
+            {isLoading ? <LoadingIndicator /> : `${filteredByView.length} ${region === 'US' ? 'US' : 'Indian'} stocks across ${tabs.length - 1} categories`}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPercent, formatStockPrice, formatTicker, getChangeBg, getChangeColor, getReturnHeatClass, displayName, type HeatTf } from '@/lib/format';
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { MergedStock, Verdict, Confidence } from '@/lib/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -356,6 +357,10 @@ export default function StockTable({ stocks, isLoading }: Props) {
   if (isLoading) {
     return (
       <div className="space-y-2">
+        <div className="flex items-center justify-between mb-2">
+          <LoadingIndicator label="Fetching watchlist" />
+          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">First load can take 5-10s</span>
+        </div>
         <div className="flex items-center gap-3 mb-4">
           <Skeleton className="h-9 flex-1 skeleton" />
           <Skeleton className="hidden h-9 w-20 skeleton md:block" />

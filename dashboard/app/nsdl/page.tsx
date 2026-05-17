@@ -130,7 +130,7 @@ function reconcileMfs(
 // ─── Sub-components ────────────────────────────────────────────────────────────
 function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
-    <Card className="bg-gradient-to-br from-zinc-950/80 to-zinc-900/40 border-white/8">
+    <Card className="bg-card border-border">
       <CardContent className="p-4">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
         <div className={`mt-1 text-2xl font-800 tabular-nums ${accent || 'text-foreground'}`}>{value}</div>
@@ -144,7 +144,7 @@ function MilestoneTile({ label, amount, yearsAway, currentValue }: { label: stri
   const reached = currentValue >= amount;
   const progress = Math.min(100, (currentValue / amount) * 100);
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+    <div className="rounded-xl border border-border bg-foreground/[0.03] p-3">
       <div className="flex items-center justify-between">
         <div className="text-sm font-700">{label}</div>
         <Badge variant="secondary" className={`text-[10px] ${reached ? 'bg-emerald-500/15 text-emerald-400' : ''}`}>
@@ -167,7 +167,7 @@ function HoldingsTable({ holdings, type, total }: { holdings: NsdlHolding[]; typ
   if (!filtered.length) return null;
   const sum = filtered.reduce((s, h) => s + h.value, 0);
   return (
-    <Card className="bg-zinc-950/60 border-white/8">
+    <Card className="bg-card border-border">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-700 flex items-center justify-between">
           <span>{type === 'equity' ? 'Equities' : type === 'mutual_fund' ? 'Mutual Funds' : type}</span>
@@ -342,7 +342,7 @@ export default function NsdlPage() {
       </div>
 
       {/* History chart */}
-      <Card className="bg-zinc-950/60 border-white/8">
+      <Card className="bg-card border-border">
         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-700">Net Worth History</CardTitle>
           <div className="flex gap-1">
@@ -351,7 +351,7 @@ export default function NsdlPage() {
                 key={r}
                 onClick={() => setHistoryRange(r)}
                 className={`px-2 py-1 text-xs rounded-md font-600 transition-colors ${
-                  historyRange === r ? 'bg-primary/15 text-primary' : 'bg-white/[0.03] text-muted-foreground hover:text-foreground'
+                  historyRange === r ? 'bg-primary/15 text-primary' : 'bg-foreground/[0.03] text-muted-foreground hover:text-foreground'
                 }`}
               >{r}</button>
             ))}
@@ -387,7 +387,7 @@ export default function NsdlPage() {
       </Card>
 
       {/* Projection chart */}
-      <Card className="bg-zinc-950/60 border-white/8">
+      <Card className="bg-card border-border">
         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-700">25-Year Projection</CardTitle>
           <div className="flex items-center gap-2 text-xs">
@@ -438,7 +438,7 @@ export default function NsdlPage() {
 
       {/* Reconciliation */}
       {recon && (
-        <Card className="bg-zinc-950/60 border-white/8">
+        <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-sm font-700">Reconciliation — Latest CAS vs alphaos Indian Portfolio</CardTitle>
           </CardHeader>
@@ -492,7 +492,7 @@ export default function NsdlPage() {
 
       {/* MF Reconciliation */}
       {mfRecon && (
-        <Card className="bg-zinc-950/60 border-white/8">
+        <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-sm font-700">Mutual Fund Reconciliation — NSDL CAS vs alphaos</CardTitle>
           </CardHeader>
@@ -545,7 +545,7 @@ export default function NsdlPage() {
 
       {/* Empty-state for holdings if sheet tab is missing */}
       {nsdl.latestHoldings.length === 0 && (
-        <Card className="bg-zinc-950/60 border-dashed border-white/10">
+        <Card className="bg-card border-dashed border-border">
           <CardContent className="p-6 text-center">
             <div className="text-sm font-700">No latest holdings data available</div>
             <div className="text-xs text-muted-foreground mt-1 max-w-lg mx-auto">

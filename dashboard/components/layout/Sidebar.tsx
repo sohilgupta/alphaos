@@ -34,13 +34,18 @@ export default function Sidebar() {
         { href: '/screener', label: 'Themes', icon: Filter },
       ];
 
-  const mobileNavItems = [
-    { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
-    { href: '/screener', label: 'Themes', icon: Filter },
-    ...(role === 'owner'
-      ? [{ href: '/portfolio', label: 'Portfolio', icon: TrendingUp }]
-      : [{ href: '/login', label: 'Owner', icon: Shield }]),
-  ];
+  const mobileNavItems = role === 'owner'
+    ? [
+        { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
+        { href: '/portfolio', label: 'Portfolio', icon: TrendingUp },
+        { href: '/nsdl',      label: 'Net Worth', icon: Wallet },
+        { href: '/screener',  label: 'Themes',    icon: Filter },
+      ]
+    : [
+        { href: '/dashboard', label: 'Watchlist', icon: BarChart2 },
+        { href: '/screener',  label: 'Themes',    icon: Filter },
+        { href: '/login',     label: 'Owner',     icon: Shield },
+      ];
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -138,7 +143,10 @@ export default function Sidebar() {
 
       {/* Mobile bottom tab bar — unchanged */}
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
+        <div
+          className="mx-auto grid max-w-md gap-1"
+          style={{ gridTemplateColumns: `repeat(${mobileNavItems.length}, minmax(0, 1fr))` }}
+        >
           {mobileNavItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/');
             const portfolioActive = href === '/portfolio' && (pathname === '/portfolio' || (pathname === '/dashboard' && activeFilter === 'PORTFOLIO'));
