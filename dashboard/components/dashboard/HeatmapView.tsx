@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { getReturnHeatClass, formatPercent, formatTicker, type HeatTf } from '@/lib/format';
+import { getReturnHeatClass, formatPercent, formatTicker, displayName, type HeatTf } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -28,17 +28,30 @@ export default function HeatmapView({ stocks }: Props) {
 
   const items = useMemo(() =>
     stocks
-      .map(s => ({
-        ticker: s.ticker,
-        name: s.live?.shortName || s.name,
-        value: metric === 'changePercent'
-          ? s.live?.changePercent ?? null
-          : metric === 'gain1M'
-            ? s.gain1M
-            : s.gain1Y,
-        price: s.live?.price ?? s.currentPriceSheet ?? null,
-        category: s.category,
-      }))
+      .map(s => {
+        // Pick a compact tile label:
+        //   - If the cleaned ticker is a meaningful symbol (has letters),
+        //     use it (MXL, GPUS — most readable in a tiny tile).
+        //   - If the ticker is a numeric BSE/NSE code (531489, 532467),
+        //     fall back to the company name truncated — a code in the
+        //     heatmap conveys nothing.
+        const cleanTicker = formatTicker(s.ticker);
+        const tickerHasLetters = /[a-zA-Z]/.test(cleanTicker);
+        const fullName = displayName({ sheetName: s.name, liveShortName: s.live?.shortName, liveLongName: s.live?.longName, ticker: s.ticker });
+        const tileLabel = tickerHasLetters ? cleanTicker : fullName;
+        return {
+          ticker: s.ticker,
+          tileLabel,
+          name: fullName,
+          value: metric === 'changePercent'
+            ? s.live?.changePercent ?? null
+            : metric === 'gain1M'
+              ? s.gain1M
+              : s.gain1Y,
+          price: s.live?.price ?? s.currentPriceSheet ?? null,
+          category: s.category,
+        };
+      })
       .filter(s => s.value !== null)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0)),
     [stocks, metric]
@@ -85,7 +98,7 @@ export default function HeatmapView({ stocks }: Props) {
             style={{ minWidth: '70px', maxWidth: '110px', flex: '1 1 70px' }}
             title={`${item.name}: ${formatPercent(item.value)}`}
           >
-            <div className="text-xs font-700 truncate min-w-0">{formatTicker(item.ticker)}</div>
+            <div className="text-xs font-700 truncate min-w-0">{item.tileLabel}</div>
             <div className="text-xs font-600 tabular-nums mt-1 opacity-90 truncate">{formatPercent(item.value, 1)}</div>
           </div>
         ))}

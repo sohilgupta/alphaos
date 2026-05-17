@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatPercent, formatPrice, getChangeBg, getChangeColor, getHeatmapColor } from '@/lib/format';
+import { formatPercent, formatPrice, getChangeBg, getChangeColor, getHeatmapColor, formatTicker, displayName } from '@/lib/format';
 import { MergedStock, CategoryPerformance } from '@/lib/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -329,9 +329,9 @@ export default function AnalyticsPage() {
                   onClick={() => router.push(`/stock/${s.ticker}`)}
                   className="flex items-center gap-3 cursor-pointer hover:bg-white/4 rounded-lg px-2 py-1.5 -mx-2 transition-colors group"
                 >
-                  <span className="text-xs text-muted-foreground/60 w-5 text-right font-600">{i + 1}</span>
-                  <span className="text-sm font-700 group-hover:text-primary transition-colors w-14">{s.ticker}</span>
-                  <span className="text-xs text-muted-foreground flex-1 truncate">{s.live?.shortName || s.name}</span>
+                  <span className="text-xs text-muted-foreground/60 w-5 text-right font-600 shrink-0">{i + 1}</span>
+                  <span className="text-sm font-700 group-hover:text-primary transition-colors w-20 shrink-0 truncate">{formatTicker(s.ticker)}</span>
+                  <span className="text-xs text-muted-foreground flex-1 truncate min-w-0">{displayName({ sheetName: s.name, liveShortName: s.live?.shortName, liveLongName: s.live?.longName, ticker: s.ticker })}</span>
                   <div className="h-1.5 w-24 bg-white/10 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${positive ? 'bg-gain/70' : 'bg-loss/70'}`}

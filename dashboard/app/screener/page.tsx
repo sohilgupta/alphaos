@@ -7,7 +7,7 @@ import { SlidersHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatPrice, formatPercent, formatMarketCap, getChangeColor, getChangeBg } from '@/lib/format';
+import { formatPrice, formatPercent, formatMarketCap, getChangeColor, getChangeBg, formatTicker, displayName } from '@/lib/format';
 import { MergedStock } from '@/lib/types';
 
 async function fetchStocks() {
@@ -220,12 +220,12 @@ export default function ScreenerPage() {
                   onClick={() => router.push(`/stock/${s.ticker}`)}
                   className="glass-card px-4 py-3 cursor-pointer hover:border-primary/30 transition-all group flex items-center gap-4"
                 >
-                  <span className="text-xs text-muted-foreground/50 w-6 font-600">{i + 1}</span>
-                  <div className="w-14">
-                    <div className="text-sm font-700 text-foreground group-hover:text-primary transition-colors">{s.ticker}</div>
+                  <span className="text-xs text-muted-foreground/50 w-6 font-600 shrink-0">{i + 1}</span>
+                  <div className="w-20 shrink-0 min-w-0">
+                    <div className="text-sm font-700 text-foreground group-hover:text-primary transition-colors truncate">{formatTicker(s.ticker)}</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-foreground/80 truncate">{s.live?.shortName || s.name}</div>
+                    <div className="text-xs text-foreground/80 truncate">{displayName({ sheetName: s.name, liveShortName: s.live?.shortName, liveLongName: s.live?.longName, ticker: s.ticker })}</div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <Badge className="text-xs bg-primary/10 text-primary/80 border-0 py-0">{s.category}</Badge>
                     </div>
