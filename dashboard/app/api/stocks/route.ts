@@ -49,14 +49,16 @@ export async function GET(request: NextRequest) {
       ...(isOwner ? indianPortfolio.map(s => s.ticker) : []),
     ]);
 
-    // Portfolio stocks: ALWAYS fetch history (no cap) — these are the ones the
-    // user cares most about seeing returns for.
-    const portfolioNeedingHistory = Array.from(portfolioTickers).filter(
-      ticker => liveQuotes.get(ticker)?.price
-    );
+    // Portfolio stocks: PRIORITISED for history but capped at 40 — past that,
+    // we'd be holding the user behind 20+ seconds of sequential Yahoo calls
+    // on a cold KV cache. Missing entries render as "—" and get filled in by
+    // the next /api/prices poll or background warm.
+    const portfolioNeedingHistory = Array.from(portfolioTickers)
+      .filter(ticker => liveQuotes.get(ticker)?.price)
+      .slice(0, 40);
 
-    // Watchlist-only stocks missing sheet returns: fetch up to 25 to fill gaps
-    // without blowing the function time budget.
+    // Watchlist-only stocks missing sheet returns: small cap (15) since sheet
+    // already has gain1W/gain1M/gain1Y for most of these.
     const watchlistNeedingHistory = Array.from(tickers)
       .filter(ticker => {
         if (portfolioTickers.has(ticker)) return false; // already covered above
@@ -64,13 +66,23 @@ export async function GET(request: NextRequest) {
         const w = watchlistDataMap.get(ticker);
         return !w || w.gain6M == null || w.gain1Y == null;
       })
-      .slice(0, 25);
+      .slice(0, 15);
 
     const tickersNeedingHistory = [...portfolioNeedingHistory, ...watchlistNeedingHistory];
 
-    const historicalMap = tickersNeedingHistory.length > 0
-      ? await getBatchHistoricalReturns(tickersNeedingHistory, liveQuotes)
-      : new Map();
+    // Hard timeout: if Yahoo is slow/rate-limited, return without history
+    // rather than holding the page hostage. The 8-second budget gives Upstash
+    // cache hits ample time but bails on a cold full-fetch.
+    const HISTORY_TIMEOUT_MS = 8000;
+    type HistoryMap = Awaited<ReturnType<typeof getBatchHistoricalReturns>>;
+    const historicalMap: HistoryMap = tickersNeedingHistory.length > 0
+      ? await Promise.race([
+          getBatchHistoricalReturns(tickersNeedingHistory, liveQuotes),
+          new Promise<HistoryMap>(resolve =>
+            setTimeout(() => resolve(new Map() as HistoryMap), HISTORY_TIMEOUT_MS),
+          ),
+        ])
+      : (new Map() as HistoryMap);
 
     const usStocks = mergeUSData(usWatchlist, usPortfolio, liveQuotes, user, historicalMap);
     const indianStocks = mergeIndianData(indianWatchlist, indianPortfolio, liveQuotes, user, historicalMap);
