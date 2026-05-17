@@ -178,16 +178,26 @@ function computeSummary(history: NsdlMonthPoint[]): NsdlSummary {
   const cagr = (Math.pow(last.value / first.value, 1 / years) - 1) * 100;
   const totalReturn = ((last.value - first.value) / first.value) * 100;
 
-  // Milestones — at the realised CAGR, when do we hit 1 Cr / 10 Cr / 100 Cr?
-  const targets = [
-    { label: '₹1 Cr',   amount: 1e7 },
-    { label: '₹10 Cr',  amount: 1e8 },
-    { label: '₹50 Cr',  amount: 5e8 },
-    { label: '₹100 Cr', amount: 1e9 },
+  // Milestones — at the realised CAGR, when do we hit the next round numbers?
+  // We list a ladder of targets and only return the ones not yet reached, so
+  // the UI shows what's still ahead rather than already-checked-off items.
+  // Reach 10 Cr → next list shows 20 / 50 / 100 / 250. Reach 250 → 500 / 1000.
+  const allTargets = [
+    { label: '₹1 Cr',    amount: 1e7  },
+    { label: '₹2 Cr',    amount: 2e7  },
+    { label: '₹5 Cr',    amount: 5e7  },
+    { label: '₹10 Cr',   amount: 1e8  },
+    { label: '₹20 Cr',   amount: 2e8  },
+    { label: '₹50 Cr',   amount: 5e8  },
+    { label: '₹100 Cr',  amount: 1e9  },
+    { label: '₹250 Cr',  amount: 2.5e9 },
+    { label: '₹500 Cr',  amount: 5e9  },
+    { label: '₹1000 Cr', amount: 1e10 },
   ];
   const r = cagr / 100;
-  const milestones: NsdlMilestone[] = targets.map(t => {
-    if (last.value >= t.amount) return { ...t, yearsAway: 0 };
+  // Keep only unreached targets, capped at the next 4 so the UI stays tight.
+  const upcoming = allTargets.filter(t => last.value < t.amount).slice(0, 4);
+  const milestones: NsdlMilestone[] = upcoming.map(t => {
     if (r <= 0) return { ...t, yearsAway: null };
     const y = Math.log(t.amount / last.value) / Math.log(1 + r);
     return { ...t, yearsAway: Math.max(0, y) };

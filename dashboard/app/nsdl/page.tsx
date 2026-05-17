@@ -141,19 +141,20 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string; 
 }
 
 function MilestoneTile({ label, amount, yearsAway, currentValue }: { label: string; amount: number; yearsAway: number | null; currentValue: number }) {
-  const reached = currentValue >= amount;
+  // Milestone list now filters out reached targets server-side, so this tile
+  // always renders an upcoming target. Progress = how far we've climbed.
   const progress = Math.min(100, (currentValue / amount) * 100);
   return (
     <div className="rounded-xl border border-border bg-foreground/[0.03] p-3">
       <div className="flex items-center justify-between">
         <div className="text-sm font-700">{label}</div>
-        <Badge variant="secondary" className={`text-[10px] ${reached ? 'bg-emerald-500/15 text-emerald-400' : ''}`}>
+        <Badge variant="secondary" className="text-[10px]">
           {formatYearsAway(yearsAway)}
         </Badge>
       </div>
-      <div className="mt-2 w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+      <div className="mt-2 w-full h-1.5 rounded-full bg-foreground/10 overflow-hidden">
         <div
-          className={`h-full rounded-full ${reached ? 'bg-emerald-400' : 'bg-primary/60'}`}
+          className="h-full rounded-full bg-primary/60"
           style={{ width: `${progress}%` }}
         />
       </div>
