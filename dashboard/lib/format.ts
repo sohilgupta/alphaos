@@ -140,18 +140,25 @@ export function slugify(str: string): string {
 /**
  * Returns true if `name` looks like a Yahoo/Google placeholder rather than a
  * real company name. Examples that are garbage:
- *   "519477.BO,0P0000XXXX"     — comma-joined symbol list
+ *   "519477.BO,0P0000XXXX"     — comma-joined symbol list (no space after comma)
  *   "0P0000ABCD"               — Yahoo mutual fund internal ID
  *   "532325.BO"                — bare exchange-suffixed code (no human name)
- * A real name is something like "Tata Motors" or "Bloom Energy Corp".
+ * Examples that are REAL (must not be flagged):
+ *   "Hyperscale Data, Inc."    — comma + space + word
+ *   "Berkshire Hathaway, Inc." — same
+ *   "CG-VAK Software & Exports" — letters with punctuation
  */
 export function isPlaceholderName(name: string | null | undefined): boolean {
   if (!name) return true;
   const s = name.trim();
   if (!s) return true;
-  if (s.includes(',')) return true;                  // comma = symbol list
   if (/^0P[0-9A-Z]{8,}$/.test(s)) return true;       // Yahoo fund code
   if (/^\d+(\.[A-Z]{2,3})?$/.test(s)) return true;   // bare BSE/NSE code
+  // Comma-joined symbol list: a comma followed immediately by a digit or
+  // uppercase letter (no space) is the Yahoo code-list pattern like
+  // "X.NS,0P0001PVBM" or "519477.BO,0P0000XXXX". A real company name with
+  // "Inc."/"Ltd." has a SPACE after the comma, so it's safe.
+  if (/,[A-Z0-9]/.test(s)) return true;
   // No letters at all — likely numeric noise
   if (!/[a-zA-Z]{2,}/.test(s)) return true;
   return false;
