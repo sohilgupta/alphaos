@@ -15,6 +15,19 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('refresh') === 'true';
+
+    // Ping mode: return a tiny payload without doing any work. Used by
+    // external cron jobs (cron-job.org) to keep this Vercel function
+    // instance warm without hitting their per-request output-size cap.
+    // The function file itself loading is what matters for warm-pool
+    // residency — no actual data fetching needed.
+    if (searchParams.get('ping') === '1') {
+      return NextResponse.json(
+        { ok: true, ts: Date.now() },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     const user = await getUser(request);
     const isOwner = user?.role === 'owner';
 

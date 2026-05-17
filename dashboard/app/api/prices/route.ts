@@ -22,6 +22,15 @@ export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
   try {
+    // Ping mode for external cron warmers — see /api/stocks for rationale.
+    const { searchParams } = new URL(request.url);
+    if (searchParams.get('ping') === '1') {
+      return NextResponse.json(
+        { ok: true, ts: Date.now() },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     const user = await getUser(request);
     const isOwner = user?.role === 'owner';
 
