@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { fetchAllSheetStocks, fetchPortfolioStocks } from '@/lib/google-sheets';
 import { getIndianPortfolio, getIndianWatchlist } from '@/lib/fetchIndianStocks';
-import { getBatchQuotes } from '@/lib/yahoo-finance';
+import { getBatchQuotes, getBatchHistoricalReturns } from '@/lib/yahoo-finance';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -50,14 +50,37 @@ export async function GET(request: NextRequest) {
       ...indianPortfolio.map(s => s.ticker),
     ]);
 
-    // Warm quote cache for every known ticker. getBatchQuotes will skip ones
-    // still fresh in KV and refresh the rest.
+    // 1) Warm quote cache for every known ticker. getBatchQuotes will skip
+    //    ones still fresh in KV and refresh the rest.
     const quotes = await getBatchQuotes(Array.from(tickers));
+
+    // 2) Warm historical-returns cache for portfolio stocks (highest priority)
+    //    + a top-up of watchlist stocks missing sheet returns. Without this
+    //    /api/stocks pays the Yahoo history fanout on first user visit even
+    //    though quote cache is warm. Capped to match /api/stocks's caps so
+    //    the cron doesn't blow the 60s function budget.
+    const portfolioTickers = new Set([
+      ...usPortfolio.map(s => s.ticker),
+      ...indianPortfolio.map(s => s.ticker),
+    ]);
+    const portfolioHistoryTickers = Array.from(portfolioTickers)
+      .filter(t => quotes.get(t)?.price)
+      .slice(0, 40);
+    const watchlistHistoryTickers = [...usWatchlist, ...indianWatchlist]
+      .filter(w => quotes.get(w.ticker)?.price && (w.gain6M == null || w.gain1Y == null))
+      .map(w => w.ticker)
+      .filter(t => !portfolioTickers.has(t))
+      .slice(0, 15);
+    const historyTickers = [...portfolioHistoryTickers, ...watchlistHistoryTickers];
+    const historyMap = historyTickers.length > 0
+      ? await getBatchHistoricalReturns(historyTickers, quotes)
+      : new Map();
 
     return NextResponse.json({
       ok: true,
       tickers: tickers.size,
       quotes: quotes.size,
+      historyWarmed: historyMap.size,
       durationMs: Date.now() - started,
     });
   } catch (err) {
