@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, TrendingDown, BarChart2, Activity, RefreshCw, Map } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -81,7 +81,17 @@ export default function DashboardPage() {
   const router = useRouter();
   const { role } = useAuth();
   const isOwner = role === 'owner';
+  const queryClient = useQueryClient();
   const [refreshToken, setRefreshToken] = useState(0);
+  const handleRefresh = () => {
+    // Same dual-action as the top-nav refresh: bust server cache + invalidate
+    // client queries. Used by the mobile button (no top nav on small screens).
+    fetch(`/api/stocks?refresh=true&t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
+    queryClient.invalidateQueries();
+  };
+  // refreshToken is still wired into the query key so any code paths that
+  // need to force a fresh query (e.g. external triggers) keep working.
+  void setRefreshToken;
   const { data, isLoading, isError, isFetching } = useQuery<StocksResponse>({
     queryKey: ['stocks', refreshToken],
     queryFn: () => fetchStocks(refreshToken > 0),
@@ -212,7 +222,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <button
-              onClick={() => setRefreshToken(Date.now())}
+              onClick={handleRefresh}
               disabled={isFetching}
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
               aria-label="Refresh stocks"
@@ -268,14 +278,10 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setRefreshToken(Date.now())}
-            disabled={isFetching}
-            className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/5 border border-foreground/8 transition-all"
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : ''}`} />
-            {isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
+          {/* Refresh moved to global top nav (Sidebar component) — calling
+              two slightly-different refresh paths from two buttons was
+              confusing. Top-nav refresh now invalidates all queries +
+              busts server cache. */}
           {isOwner && !isLoading && stocks.length > 0 && (
             <CopilotInsights stocks={stocks} region={region} />
           )}

@@ -265,12 +265,24 @@ export default function StockTable({ stocks, isLoading }: Props) {
   };
 
   const sorted = useMemo(() => {
-    const searched = stocks.filter(s =>
-      !search ||
-      s.ticker.toLowerCase().includes(search.toLowerCase()) ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.category.toLowerCase().includes(search.toLowerCase())
-    );
+    const q = search.toLowerCase().trim();
+    const searched = !q
+      ? stocks
+      : stocks.filter(s => {
+          // Search across every meaningful name field. Yahoo's shortName /
+          // longName often catches stocks whose sheet entry is a code (e.g.
+          // searching "vak" finds 531489 because Yahoo has "CG-VAK Software").
+          const haystack = [
+            s.ticker,
+            s.name,
+            s.category,
+            s.live?.shortName,
+            s.live?.longName,
+          ]
+            .filter(Boolean)
+            .map(v => String(v).toLowerCase());
+          return haystack.some(v => v.includes(q));
+        });
 
     if (quickFilter) {
       if (quickFilter.kind === 'timeframe') {

@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart2, TrendingUp, Filter, RefreshCw, Activity, Shield, LockOpen, Wallet } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -17,6 +18,7 @@ export default function Sidebar() {
   const [lastUpdated, setLastUpdated] = useState<string>('—');
   const [refreshing, setRefreshing] = useState(false);
   const { role, logout } = useAuth();
+  const queryClient = useQueryClient();
   const activeFilter = typeof window === 'undefined'
     ? undefined
     : new URLSearchParams(window.location.search).get('filter')?.toUpperCase();
@@ -43,13 +45,20 @@ export default function Sidebar() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetch('/api/stocks?refresh=true');
+      // 1) Bust the server-side cache so the next read pulls fresh from
+      //    Yahoo/Sheets. Fire-and-forget — the response itself isn't useful
+      //    here, we just want the side effect of populating Upstash.
+      fetch(`/api/stocks?refresh=true&t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
+      // 2) Tell React Query every cached query is stale. This triggers an
+      //    immediate refetch on the currently-visible page so the new
+      //    server data lands without a page reload.
+      await queryClient.invalidateQueries();
       const now = Date.now();
       localStorage.setItem('lastRefresh', now.toString());
       setLastUpdated(new Date(now).toLocaleTimeString());
     } catch {}
     setRefreshing(false);
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
