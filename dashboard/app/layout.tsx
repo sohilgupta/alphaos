@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
+import Footer from '@/components/layout/Footer';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
@@ -57,6 +58,7 @@ export default function RootLayout({
                 <Sidebar />
                 <main className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-0">
                   {children}
+                  <Footer />
                 </main>
               </div>
             </TooltipProvider>
