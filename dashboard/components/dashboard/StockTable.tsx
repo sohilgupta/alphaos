@@ -629,9 +629,17 @@ export default function StockTable({ stocks, isLoading }: Props) {
                           </td>
                         )}
                         <td className="px-3 py-2.5">
-                          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary/80 border-0 truncate max-w-[100px]">
-                            {stock.originalTheme || 'Uncategorized'}
-                          </Badge>
+                          {(() => {
+                            const theme = stock.originalTheme || 'Uncategorized';
+                            return (
+                              <span
+                                title={theme}
+                                className="inline-block max-w-[140px] truncate align-middle rounded-full px-2 py-0.5 text-xs bg-primary/10 text-primary/80"
+                              >
+                                {theme}
+                              </span>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );
